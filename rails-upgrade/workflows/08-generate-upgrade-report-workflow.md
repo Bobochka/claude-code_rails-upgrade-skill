@@ -61,11 +61,9 @@ Read `templates/upgrade-report-template.md`. It is the shape of the report; this
 | Template section | Filled from |
 |------------------|-------------|
 | Header, Executive Summary, Baseline, Patterns checked | Step 1 counts; `{TREE_CHANGES}` from Workflow 04; `{ONE_PARAGRAPH_SUMMARY}` written last, once the buckets are known |
+| What Was Checked (three subsections) | Workflow 02 inventory, Workflow 06 buckets and check used, Workflow 07 output block. Evidence, not a second to-do list: anything actionable from them is also a Fix Before Bump entry |
 | 🛑 Fix Before Bump | Workflow 05 `breaking` + `deprecation` findings; Workflow 02 entries deferred to the bump (only those); Workflow 06 required bumps and blockers; Workflow 07 boot bumps, suite failures and every deprecation warning {TO} emitted. One block per entry, `{HOW_FOUND}` says which. HIGH → MEDIUM → LOW. When the cause is an absent line (no `load_defaults` at all), say so in Affected files instead of inventing a file:line |
 | 📅 Fix When Ready | Workflow 05 `migration` + `optional` findings, plus anything optional found by hand along the way (a Gemfile line the target declares itself, a config key with a better default) with `{HOW_FOUND}` saying so |
-| Deprecation Warnings on {FROM} | Workflow 02 inventory, one row per distinct warning, status as the template's comment lists |
-| Gem Compatibility | Workflow 06 buckets and the check that produced them. With no bumps and no blockers: the one-line summary, no table |
-| Boot and Tests Under `Gemfile.next` | Workflow 07 output block verbatim, plus the count of {TO} deprecation warnings |
 | Plan | fixed sections; `{BREAKING_CHANGE_TASKS}` is one checkbox per 🛑 entry. The plan never names workflows or steps: the reader does not have this skill's files |
 | Testing Checklist | `{MANUAL_CHECKS}` tailored to the app's routes, mailers and jobs; drop what the app does not have |
 | Everything else | as written in the template |

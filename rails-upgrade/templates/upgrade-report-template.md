@@ -29,6 +29,52 @@
 {ONE_PARAGRAPH_SUMMARY}
 <!-- Three or four plain sentences: how big this hop is for this app, where the findings come from, what kind of work remains. Written for someone who reads nothing else. -->
 
+**Contents:** What Was Checked (deprecations, gems, boot and tests) · Fix Before Bump · Fix When Ready · Plan · Testing Checklist · Rollback Plan
+
+---
+
+## What Was Checked
+
+The three checks below run before any finding is written. Anything they turn up that needs work is an entry in Fix Before Bump; these sections record what was checked and what came back.
+
+### Deprecation Warnings on {FROM}
+
+The warnings the current version emits, collected before any dual-boot work.
+
+| Warning | Count | Status | Note |
+|---------|-------|--------|------|
+{DEPRECATION_INVENTORY_ROWS}
+<!-- Status: fixed (already in the baseline above) / deferred to the bump (setter removed on {TO}; also listed in Fix Before Bump) / deferred to a later hop (about a version after {TO}) / gem-owned (belongs to the gem's own update) -->
+
+---
+
+### Gem Compatibility
+
+Check used: {GEM_CHECK_USED}.
+<!-- "next_rails bundle_report compatibility", "railsbump", or "not run: <reason>" -->
+
+{GEM_SUMMARY}
+<!-- When nothing changes: "All {GEM_OK} direct gems already declare support for {TO}. Blockers: none." and omit the table below entirely, header included.
+     Otherwise keep the table, one row per gem that needs a bump or has no compatible release. -->
+
+| Gem | Locked | Needed for {TO} | Bucket |
+|-----|--------|-----------------|--------|
+{GEM_ROWS}
+
+Blockers (no released version supports {TO}): {GEM_BLOCKER_LIST}.
+
+---
+
+### Boot and Tests Under `Gemfile.next`
+
+```
+{BOOT_SMOKE_BLOCK}
+```
+
+Suite under `Gemfile.next`: {NEXT_SUITE_RESULT}. Deprecation warnings {TO} emitted during boot or the suite: {TARGET_DEP_COUNT}; each one is a Fix Before Bump entry below. Test failures, if any, are Fix Before Bump entries too.
+
+---
+
 ---
 
 ## 🛑 Fix Before Bump ({FIX_BEFORE_COUNT})
@@ -80,44 +126,6 @@ Silent and working on {TO}; recommended, not tied to the bump. Do them whenever 
 
 {FIX_WHEN_READY_BLOCKS}
 <!-- When empty: "None. All {PATTERNS_CHECKED} patterns for this hop were searched." -->
-
----
-
-## Deprecation Warnings on {FROM}
-
-The warnings the current version emits, collected before any dual-boot work.
-
-| Warning | Count | Status | Note |
-|---------|-------|--------|------|
-{DEPRECATION_INVENTORY_ROWS}
-<!-- Status: fixed (already in the baseline above) / deferred to the bump (setter removed on {TO}; also listed in Fix Before Bump) / deferred to a later hop (about a version after {TO}) / gem-owned (belongs to the gem's own update) -->
-
----
-
-## Gem Compatibility
-
-Check used: {GEM_CHECK_USED}.
-<!-- "next_rails bundle_report compatibility", "railsbump", or "not run: <reason>" -->
-
-{GEM_SUMMARY}
-<!-- When nothing changes: "All {GEM_OK} direct gems already declare support for {TO}. Blockers: none." and omit the table below entirely, header included.
-     Otherwise keep the table, one row per gem that needs a bump or has no compatible release. -->
-
-| Gem | Locked | Needed for {TO} | Bucket |
-|-----|--------|-----------------|--------|
-{GEM_ROWS}
-
-Blockers (no released version supports {TO}): {GEM_BLOCKER_LIST}.
-
----
-
-## Boot and Tests Under `Gemfile.next`
-
-```
-{BOOT_SMOKE_BLOCK}
-```
-
-Suite under `Gemfile.next`: {NEXT_SUITE_RESULT}. Deprecation warnings {TO} emitted during boot or the suite: {TARGET_DEP_COUNT}; each one is a Fix Before Bump entry above. Test failures, if any, are Fix Before Bump entries too.
 
 ---
 
