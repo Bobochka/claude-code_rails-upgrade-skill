@@ -1,12 +1,11 @@
 # Rails {FROM} → {TO} Upgrade Report
 
-**Generated:** {DATE}
-**Project:** {PROJECT_NAME}
-**Current version:** {FROM_FULL}, latest patch of its series
-**Target version:** {TO_FULL}
-**Dual-boot:** `Gemfile.next` resolves {TO_FULL}; the default `Gemfile` stays on {FROM_FULL} until the pin changes (see the plan)
-
-**Changes made while producing this report:** {TREE_CHANGES}
+- **Generated:** {DATE}
+- **Project:** {PROJECT_NAME}
+- **Current version:** {FROM_FULL}, latest patch of its series
+- **Target version:** {TO_FULL}
+- **Dual-boot:** `Gemfile.next` resolves {TO_FULL}; the default `Gemfile` stays on {FROM_FULL} until the pin changes (see the plan)
+- **Changes made while producing this report:** {TREE_CHANGES}
 <!-- e.g. "Gemfile: next_rails gem and if next? branch added; Gemfile.lock and Gemfile.next.lock re-resolved. Uncommitted." or "none" -->
 
 ---
@@ -24,8 +23,8 @@
 | Test suite under `Gemfile.next` | {NEXT_SUITE_RESULT} |
 <!-- NEXT_SUITE_RESULT names every suite that ran: unit and system for Minitest apps, the spec suite for RSpec -->
 
-**Baseline on {FROM_FULL}:** {TEST_COUNT} tests, {ASSERTION_COUNT} assertions, {FAILURE_COUNT} failures.
-**Patterns checked:** {PATTERNS_CHECKED} for this hop; {PATTERNS_FIRED} matched.
+- **Baseline on {FROM_FULL}:** {TEST_COUNT} tests, {ASSERTION_COUNT} assertions, {FAILURE_COUNT} failures.
+- **Patterns checked:** {PATTERNS_CHECKED} for this hop; {PATTERNS_FIRED} matched.
 
 {ONE_PARAGRAPH_SUMMARY}
 <!-- Three or four plain sentences: how big this hop is for this app, where the findings come from, what kind of work remains. Written for someone who reads nothing else. -->
@@ -77,7 +76,7 @@ Everything that raises, fails to boot, or warns on {TO} about behavior that chan
 
 ## 📅 Fix When Ready ({FIX_WHEN_READY_COUNT})
 
-Silent and working on {TO}; recommended, not tied to the bump. Same block shape as above; entries found by hand (a Gemfile line the target no longer needs, a config key with a better default) belong here too.
+Silent and working on {TO}; recommended, not tied to the bump. Do them whenever the team chooses, before or after the pin changes. The one timing rule: entries marked `migration` become warnings or removals at a later hop, so finishing them before the next hop starts avoids doing them under pressure. Same block shape as above; entries found by hand (a Gemfile line the target no longer needs, a config key with a better default) belong here too.
 
 {FIX_WHEN_READY_BLOCKS}
 <!-- When empty: "None. All {PATTERNS_CHECKED} patterns for this hop were searched." -->
