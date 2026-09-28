@@ -552,7 +552,7 @@ ORDER_WITHOUT_ARGUMENTS:
   # relation method right after the call, or empty / nil / [] arguments, so
   # that reading an `order` association or column does not get flagged.
   match:
-    - '        link = PersonConsentLink.where(person_id: person_id).order.last'
+    - '        link = Membership.where(user_id: user_id).order.last'
     - '    scope.reorder.to_a'
     - '    Widget.where(active: true).order.first'
     - '    Widget.order().each { |w| puts w }'
@@ -583,8 +583,8 @@ SQUEEL_ORDER_JOINED_TABLE:
   # is not exactly :asc or :desc. The scanner matches file content, so a hash
   # spread over several lines is reached too; fixtures cover one line.
   match:
-    - "          .order(patient_groups: :id)"
-    - "          .order({ checklist_task_items: :month })"
+    - "          .order(tags: :id)"
+    - "          .order({ task_items: :month })"
     - "    relation.order(:event => :start)"
     - "    relation.order({:event => :start})"
     - "    relation.order(event: :start).where(:description => x)"

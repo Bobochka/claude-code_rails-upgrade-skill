@@ -494,10 +494,10 @@ than a relation method (`.order.map { ... }`, `.order.sort_by { ... }`).
 **Fix:**
 ```ruby
 # BEFORE
-PersonConsentLink.where(person_id: person_id).order.last
+Membership.where(user_id: user_id).order.last
 
 # AFTER
-PersonConsentLink.where(person_id: person_id).order(:id).last
+Membership.where(user_id: user_id).order(:id).last
 ```
 
 `:id` is not an arbitrary choice for the `.order.last` shape. On 3.2, `last` with no order
@@ -507,14 +507,14 @@ so `order(:id).last` reproduces the old result exactly.
 ```ruby
 # BEFORE: raises on 4.0, sorted by nothing on 3.2
 .order(
-  { patient_groups: :id },
-  { checklist_task_items: :month }
+  { tags: :id },
+  { task_items: :month }
 )
 
 # AFTER: strings are the only form that can express a sort across joined tables
 .order(
-  "patient_groups.id",
-  "checklist_task_items.month"
+  "tags.id",
+  "task_items.month"
 )
 ```
 
@@ -528,7 +528,7 @@ review, not just a syntax fix. Check whether any test asserts on the old row ord
 whether downstream code (a CSV export, a paginated screen) depends on it.
 
 For Rails 5.2 and later, a bare string passed to `order` triggers a `Dangerous query
-method` warning; wrap it as `Arel.sql("patient_groups.id")`. `Arel.sql` exists since Rails
+method` warning; wrap it as `Arel.sql("tags.id")`. `Arel.sql` exists since Rails
 3.0, so the wrap is safe to add now.
 
 ---
