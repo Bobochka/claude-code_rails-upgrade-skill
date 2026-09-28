@@ -602,6 +602,7 @@ REMOTE_FORM_CSRF_TOKEN:
   # Pattern: form helpers carrying remote: true (either hash syntax).
   # Remote links and plain forms are not affected.
   match:
+    - "= form_for @x, html: { data: { confirm: \"#{t(:sure)}\" } }, remote: true do |f|"
     - '= form_for @user, remote: true do |f|'
     - '  <%= form_tag(search_path, remote: true) do %>'
     - '= form_for @person, :remote => true, html: { class: "opt-in-form" } do |f|'
@@ -622,6 +623,7 @@ REMOTE_FORM_CSRF_TOKEN:
     - '= form_for @note, remote: true, html: { data: { remote: true } } do |f|'
     - '= form_for @note, html: { data: { confirm: "Sure?" } }, remote: true do |f|'
   no_match:
+    - "= form_for @x, data: { remote: true, t: \"#{x}\" } do |f|"
     # data: { remote: true } keeps the hidden token on 4.0, whatever else the hash holds
     - '= form_for @note, html: { data: { remote: true } } do |f|'
     - '= form_for @note, html: { data: { remote: true, type: :json } } do |f|'
