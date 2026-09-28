@@ -11,7 +11,7 @@ upgrade_findings:
         - "app/"
         - "lib/"
       explanation: "Rails 4.1 removed the activerecord-deprecated_finders dependency, which is where find_all_by_*, find_last_by_* and scoped_by_* were defined, so they raise NoMethodError. find_by_* and find_by_*! are not flagged: Rails 4.1 core still defines them (ActiveRecord::DynamicMatchers::FindBy and FindByBang). The dynamic find_or_create_by_* / find_or_initialize_by_* forms are FIND_OR_X_BY_DYNAMIC"
-      fix: "Rewrite: find_all_by_* → where(col: value); find_last_by_* → where(col: value).last; scoped_by_* → where(col: value). Leave find_by_* and find_by_*! alone, they still work on 4.1. As a short-term bridge, add gem 'activerecord-deprecated_finders', require: 'active_record/deprecated_finders' (without the require the gem is never loaded on 4.1, see DEPRECATED_FINDERS_AUTOREQUIRE)"
+      fix: "Rewrite: find_all_by_* → where(col: value); find_last_by_* → where(col: value).last; scoped_by_* → where(col: value). Leave find_by_* and find_by_*! alone, they still work on 4.1. As a short-term bridge, add gem 'activerecord-deprecated_finders', require: 'active_record/deprecated_finders' (a bare gem line is not loaded on 4.1 unless the app requires active_record/deprecated_finders itself, see DEPRECATED_FINDERS_AUTOREQUIRE)"
       variable_name: "DYNAMIC_FINDERS"
 
     - name: "Dynamic find_or_initialize_by_* / find_or_create_by_*"
