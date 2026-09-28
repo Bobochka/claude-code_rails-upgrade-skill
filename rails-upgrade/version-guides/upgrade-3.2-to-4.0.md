@@ -315,33 +315,6 @@ end
 
 ---
 
-#### Dynamic Finders Deprecated
-
-**What Changed:**
-Dynamic finders like `find_all_by_*` are deprecated.
-
-**Detection Pattern:**
-```ruby
-User.find_all_by_email(email)
-User.find_by_name_and_email(name, email)
-User.find_or_create_by_email(email)
-```
-
-**Fix:**
-```ruby
-# BEFORE
-User.find_all_by_email(email)
-User.find_by_name_and_email(name, email)
-User.find_or_create_by_email(email)
-
-# AFTER
-User.where(email: email)
-User.find_by(name: name, email: email)
-User.find_or_create_by(email: email)
-```
-
----
-
 #### Routes Require HTTP Method
 
 **What Changed:**
@@ -839,6 +812,62 @@ By the time `after_destroy` runs, this row is gone, so the reciprocal cascade re
 
 ---
 
+#### Dynamic Finders Deprecated
+
+**What Changed:**
+Rails 4.0 keeps only `find_by_*` and `find_by_*!` in Active Record. `find_all_by_*`,
+`find_last_by_*`, `find_or_create_by_*`, `find_or_initialize_by_*` and `scoped_by_*` move
+to the `activerecord-deprecated_finders` gem, which activerecord 4.0 depends on, so they
+keep working and print a warning on every call:
+
+```
+DEPRECATION WARNING: This dynamic method is deprecated. Please use e.g. Post.where(...).all instead.
+```
+
+Rails 4.1 drops the gem and these calls raise `NoMethodError`. `find_by_*` is not part of
+this change: it works without a warning on 4.0 and later. It only warns when it is passed
+an options hash or a block.
+
+**Detection Pattern:**
+```ruby
+User.find_all_by_email(email)
+User.find_last_by_email(email)
+User.find_or_create_by_email(email)
+User.find_or_initialize_by_email(email)
+```
+
+**Fix:**
+The keyword forms `find_or_create_by(email: email)` and `find_by(email: email)` do not
+exist on Rails 3.2 (they raise `NoMethodError` there), so rewrite with calls that work on
+both versions and the change can ship before the bump:
+
+```ruby
+# BEFORE
+User.find_all_by_email(email)
+User.find_last_by_email(email)
+User.find_or_create_by_email(email)
+User.find_or_initialize_by_email(email)
+
+# AFTER (Rails 3.2 and 4.0)
+User.where(email: email).to_a
+User.where(email: email).last
+User.where(email: email).first_or_create
+User.where(email: email).first_or_initialize
+```
+
+Once the app is on 4.0, `find_or_create_by(email: email)` and
+`find_or_initialize_by(email: email)` are the shorter spellings.
+
+Keep `.to_a` where the result is read more than once: `find_all_by_*` returned an Array,
+and a bare `where` is a lazy Relation that runs a new query for each `any?`, `size` or
+`each`.
+
+An app can define its own method whose name starts with one of these prefixes. The
+detection patterns skip the `def` line but not the callers, so check for a matching `def`
+before rewriting a call.
+
+---
+
 ### 🟢 LOW PRIORITY (but commonly encountered)
 
 #### Fixture Dates Must Be Cast to Strings
@@ -1116,7 +1145,7 @@ bundle update rails
 1. Add lambda to all scopes
 2. **Migrate all association `:conditions`, `:order`, `:extend`, `:uniq` options to lambda syntax** (this is typically the highest-volume change)
 3. Rewrite `:finder_sql` associations as scopes or methods; remove `:readonly` options
-4. Update dynamic finders to where/find_by
+4. Rewrite `find_all_by_*`, `find_last_by_*`, `find_or_create_by_*` and `find_or_initialize_by_*` with `where` (`find_by_*` can stay)
 5. Add HTTP methods to routes
 6. Migrate to Strong Parameters and remove `require 'strong_parameters'` calls
 7. Replace `rescue_action` with `rescue_from`

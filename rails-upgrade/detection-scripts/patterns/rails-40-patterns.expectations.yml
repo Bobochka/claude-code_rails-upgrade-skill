@@ -119,8 +119,18 @@ FINDER_SQL:
 FIND_ALL_BY:
   match:
     - "User.find_all_by_email(email)"
+    - "    users = account.users.find_all_by_role_and_active(\"admin\", true)"
+    # receiverless call inside a class method
+    - "    find_all_by_status(\"open\")"
+    - "  expect(Post.find_all_by_author_id(1).size).to eq(2)"
   no_match:
     - "User.where(email: email)"
+    # an app-defined method, not the Rails matcher
+    - "  def self.find_all_by_region(region)"
+    - "  def find_all_by_tag(tag)"
+    # stub symbol and spec label
+    - "    allow(User).to receive(:find_all_by_email).and_return([])"
+    - "  describe \"#find_all_by_region\" do"
 
 FIND_OR_CREATE_BY:
   match:
