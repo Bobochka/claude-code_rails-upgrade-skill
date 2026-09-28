@@ -13,6 +13,7 @@
 #   ruby <skill>/detection-scripts/scan_patterns.rb --patterns path/to/rails-70-patterns.yml
 #   ruby <skill>/detection-scripts/scan_patterns.rb --summary   # summary table only
 #   ruby <skill>/detection-scripts/scan_patterns.rb --only VAR1,VAR2   # detail for these patterns only
+#   ruby <skill>/detection-scripts/scan_patterns.rb --explain VAR1     # what a pattern means + guide index
 #   ruby <skill>/detection-scripts/scan_patterns.rb --format json --output tmp/pattern-scan.json
 #   ruby <skill>/detection-scripts/scan_patterns.rb --self-test
 #
@@ -333,6 +334,61 @@ def guide_hop(current)
   g ? File.basename(g)[/-to-(\d+\.\d+)\.md\z/, 1] : nil
 end
 
+# The version guide whose hop ends at `target`, or nil.
+def guide_for(target)
+  Dir[File.join(GUIDES_DIR, "upgrade-*-to-#{target}.md")].first
+end
+
+# [[heading, first_line, last_line]] for every "## " and "#### " heading, so a
+# reader can open one entry by line range instead of loading the whole guide.
+def guide_index(path)
+  lines = File.readlines(path)
+  heads = []
+  fence = false
+  lines.each_with_index do |l, i|
+    fence = !fence if l.start_with?("```")
+    next if fence
+    heads << [l.sub(/\A#+\s*/, "").strip, i + 1, l[/\A#+/].length] if l =~ /\A(##|####) /
+  end
+  heads.each_with_index.map do |(h, start, level), i|
+    nxt = heads[(i + 1)..-1].find { |_, _, lv| lv <= level }
+    [h, start, nxt ? nxt[1] - 1 : lines.length]
+  end
+end
+
+# --explain: what one pattern means and where its guide entry is, without
+# scanning the app.
+def render_explain(patterns_path, target, vars)
+  doc = YAML.load_file(patterns_path)["upgrade_findings"] || {}
+  entries = {}
+  PRIORITIES.each { |p| Array(doc[p]).each { |e| entries[e["variable_name"]] = [p, e] } }
+  unknown = vars - entries.keys
+  abort("scan_patterns: --explain names no pattern in #{File.basename(patterns_path)}: #{unknown.join(', ')}") unless unknown.empty?
+  out = []
+  vars.each do |v|
+    pr, e = entries[v]
+    out << "## #{e['name']} (`#{v}`)"
+    out << ""
+    out << "- Kind: #{e['kind']} · Priority: #{PRIORITY_LABEL[pr]}"
+    out << "- Explanation: #{e['explanation']}"
+    out << "- Fix: #{e['fix']}"
+    Array(e["prereqs"]).each { |q| out << "- Prereq: #{q['gem']} >= #{q['min_version']} (#{q['reason']}#{q['when'] ? "; when #{q['when']}" : ''})" }
+    out << ""
+  end
+  guide = guide_for(target)
+  if guide
+    rel = guide.sub(%r{\A.*/(version-guides/)}, '\1')
+    out << "## Guide entries in `#{rel}`"
+    out << ""
+    out << "Read only the entry you need, by line range. The entry for a pattern is usually the one whose title names the same API."
+    out << ""
+    guide_index(guide).each { |h, a, b| out << "- #{a}-#{b}: #{h}" }
+  else
+    out << "No version guide ends at Rails #{target}."
+  end
+  out.join("\n") + "\n"
+end
+
 def patterns_file_for(version)
   File.join(PATTERNS_DIR, "rails-#{version.delete('.')}-patterns.yml")
 end
@@ -582,6 +638,16 @@ def self_test
     check.call("reads the hop from Gemfile.lock", lock_rails_version(File.join(dir, "Gemfile.lock")) == "4.0")
   end
   check.call("the 6.0 hop is 6.1 per the guides, not the next patterns file", guide_hop("6.0") == "6.1")
+  # Every shipped guide indexes to well-formed ranges, and a `# BEFORE` comment
+  # inside a code fence is not taken for a heading.
+  Dir[File.join(GUIDES_DIR, "upgrade-*.md")].each do |g|
+    idx = guide_index(g)
+    check.call("#{File.basename(g)}: every index range starts before it ends", idx.all? { |_, a, b| a <= b })
+    check.call("#{File.basename(g)}: no code-fence line indexed", idx.none? { |h, _, _| h =~ /\A(BEFORE|AFTER)\b/ })
+  end
+  ex = render_explain(patterns_file_for("4.1"), "4.1", ["DEFAULT_SCOPE"])
+  check.call("--explain prints the pattern and the guide entry index",
+             ex.include?("`DEFAULT_SCOPE`") && ex.include?("upgrade-4.0-to-4.1.md") && ex =~ /^- \d+-\d+: `default_scope` Chains/)
   check.call("normalizes 41 and 4.1.2", normalize_target("41") == "4.1" && normalize_target("4.1.2") == "4.1")
 
   # Every shipped patterns file must load and scan without raising.
@@ -619,6 +685,7 @@ if $PROGRAM_NAME == __FILE__
     o.on("--format FORMAT", %w[markdown json], "markdown (default) or json") { |v| opts[:format] = v }
     o.on("--summary", "print the summary table only, no per-site detail") { opts[:summary] = true }
     o.on("--only VARS", "per-site detail only for these variable_names (comma-separated)") { |v| opts[:only] = v.split(",").map(&:strip) }
+    o.on("--explain VARS", "print these patterns' explanation, fix and prereqs plus the guide's entry index, without scanning") { |v| opts[:explain] = v.split(",").map(&:strip) }
     o.on("--show-suppressed", "list the sites dropped by each entry's exclude:") { opts[:show_suppressed] = true }
     o.on("--output FILE", "write to FILE instead of stdout (creates its directory; removed first, written only on success)") { |v| opts[:output] = v }
     o.on("--self-test", "run built-in assertions and exit") { opts[:self_test] = true }
@@ -658,6 +725,11 @@ if $PROGRAM_NAME == __FILE__
     unless File.file?(patterns)
       abort("scan_patterns: no patterns file for Rails #{target}. Available: #{available_versions.join(', ')}")
     end
+  end
+
+  if opts[:explain]
+    print render_explain(patterns, target, opts[:explain])
+    exit 0
   end
 
   results, roots = run_scan(patterns, root)
