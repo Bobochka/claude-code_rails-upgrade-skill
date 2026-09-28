@@ -158,6 +158,19 @@ upgrade_findings:
       fix: "If clients require second precision: `ActiveSupport::JSON::Encoding.time_precision = 0` in an initializer. Otherwise accept the new default"
       variable_name: "JSON_TIME_PRECISION"
 
+    - name: "Relation#all on a relation or association (returns a Relation, not an Array)"
+      kind: breaking
+      pattern: "\\.all\\s*$|\\.all\\s*[^(?\\w]"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "spec/"
+        - "test/"
+      explanation: "On Rails 4.0 the bundled activerecord-deprecated_finders gem defines Relation#all: calling it on a relation or an association (Post.where(published: true).all, user.posts.all) emits a deprecation warning and returns an Array. Rails 4.1 drops that gem, so the same call falls through to the model's class-level all and returns a Relation. Code that treats the result as an Array breaks: sort!, pop, shift and the other bang mutators raise NoMethodError, and is_a?(Array) turns false. Passing finder options (.all(conditions: ...)) raises ArgumentError on 4.1; this pattern skips the `.all(` form. HIGH FALSE-POSITIVE RATE: most hits are Model.all on a constant, which is the replacement and is fine. It also matches Capybara's page.all and any object that defines its own all method. Check the receiver of every hit before rewriting it"
+      fix: "Replace rel.all with rel.to_a, which returns an Array on 4.0 and 4.1 and does not warn. Prefer to_a over the load the deprecation message also suggests: load returns the Relation, so it changes the return type. Where the caller only iterates (each, map), dropping .all also works, but keep to_a when the result is appended to with <<: on a has_many association of a saved record, << saves the new record. Leave Model.all, page.all(...) and custom all methods alone. As a short-term bridge, gem 'activerecord-deprecated_finders' restores the 4.0 behavior on 4.1"
+      variable_name: "RELATION_ALL"
+
   low_priority:
     - name: "Spring gem in Gemfile (presence check)"
       kind: optional
@@ -264,7 +277,7 @@ dependencies:
   activerecord-deprecated_finders:
     check: false
     gem_name: "activerecord-deprecated_finders"
-    message: "Short-term bridge: restores find_all_by_*, find_last_by_*, scoped_by_*, and dynamic find_or_*_by_* finders removed from Rails 4.1"
+    message: "Short-term bridge: restores find_all_by_*, find_last_by_*, scoped_by_*, and dynamic find_or_*_by_* finders removed from Rails 4.1, and the Array-returning Relation#all"
     url: "https://github.com/rails/activerecord-deprecated_finders"
 
   spring:

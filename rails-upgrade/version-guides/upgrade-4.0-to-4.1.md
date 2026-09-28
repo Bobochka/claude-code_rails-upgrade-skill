@@ -409,6 +409,37 @@ Or update consumers to accept fractional seconds.
 
 ---
 
+#### `Relation#all` Returns a Relation, Not an Array
+
+**What Changed:**
+On 4.0, `Relation#all` comes from the bundled `activerecord-deprecated_finders` gem: calling it on a relation or an association emits a deprecation warning and returns an `Array`. Rails 4.1 drops that gem, so the same call falls through to the model's class-level `all` and returns a `Relation`. Iteration keeps working. Code that treats the result as an `Array` does not: `sort!`, `pop`, `shift` and the other bang mutators raise `NoMethodError`, and `is_a?(Array)` turns `false`. The finder-options form (`.all(conditions: ...)`) raises `ArgumentError` on 4.1.
+
+`Model.all` on a constant is the replacement, not the problem. It returns a `Relation` on both versions and does not warn.
+
+**Detection Pattern:**
+```ruby
+Post.where(published: true).all
+@post.comments.all
+User.active.all.sort_by!(&:name)
+```
+
+**Fix:**
+```ruby
+# BEFORE
+posts = Post.where(published: true).all
+names = User.active.all.sort_by!(&:name)
+
+# AFTER
+posts = Post.where(published: true).to_a
+names = User.active.to_a.sort_by!(&:name)
+```
+
+Use `to_a`, not the `load` the deprecation message also suggests: `load` returns the `Relation`, so it changes the return type. Dropping `.all` entirely is fine where the caller only iterates, but keep `to_a` when the result is appended to with `<<`: on a `has_many` association of a saved record, `<<` saves the new record instead of adding to a local list.
+
+The pattern flags every `.all` called without arguments. Most hits are `Model.all`. Capybara's `page.all(...)` is skipped, but objects with their own `all` method still match. Check the receiver before rewriting. `gem 'activerecord-deprecated_finders'` restores the 4.0 behavior on 4.1 as a short-term bridge.
+
+---
+
 ### 🟢 LOW PRIORITY
 
 #### Spring Preloader (New Default)
@@ -672,6 +703,7 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 12. Pin JSON time precision if clients need it (`time_precision = 0`).
 13. Remove MultiJSON usage or add it back to the `Gemfile` explicitly.
 14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
+15. Replace `.all` on relations and associations with `.to_a` (leave `Model.all` alone).
 
 ### Phase 6: Testing
 - Run full test suite.
@@ -698,6 +730,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `I18n::InvalidLocale` on a request that worked on 4.0 | "I18n Enforces Available Locales" — add the locale to `config.i18n.available_locales` |
 | `TypeError: CacheDigests is not a class` from every `rake` task | "`cache_digests` Gem Collides with Core Cache Digests" — `gem 'cache_digests' unless NextRails.next?`, move `CacheDigests::*` calls to `ActionView::Digestor` |
 | API clients fail to parse `2024-01-01T00:00:00.000Z` | "`as_json` Millisecond Precision for Time/DateTime/TWZ" — `ActiveSupport::JSON::Encoding.time_precision = 0` or update consumers |
+| `NoMethodError: undefined method 'sort!' for #<Post::ActiveRecord_Relation...>` on a `.all` result | "`Relation#all` Returns a Relation, Not an Array": replace `rel.all` with `rel.to_a` |
 
 ---
 
