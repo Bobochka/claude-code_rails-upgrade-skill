@@ -575,6 +575,8 @@ ORDER_WITHOUT_ARGUMENTS:
     - '    Widget.reorder(nil).to_a'
     # different method entirely
     - '    Widget.order_by(:id).last'
+    # a minified JavaScript line (500+ characters) with a d3-style .order() call
+    - '!function(n){var t=n.layout.stack();n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;n.x=t.y(n.x)+n.dx;return t.order()}(d3)'
 
 SQUEEL_ORDER_JOINED_TABLE:
   # Pattern: a hash anywhere in an order / reorder argument list whose value
