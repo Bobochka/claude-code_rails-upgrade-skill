@@ -245,6 +245,51 @@ The chained form works on 3.2, 4.0 and 4.1, so it can ship before the bump. Call
 
 ---
 
+#### Calculations Silently Ignore Finder Options
+
+**What Changed:**
+On 4.0, `count`, `sum`, `average`, `minimum`, `maximum` and `calculate` accept finder options (`:conditions`, `:joins`, `:group`, `:select`, `:order`, `:include`, ...) only because `activerecord-deprecated_finders` overrides `Relation#calculate`, applies the options as a scope, and warns `Relation#calculate with finder options is deprecated`. Rails 4.1 drops that dependency. Core 4.1 still accepts the options hash but never reads it, so **nothing raises**: the options are dropped and the query runs without them. With four items, two of them red:
+
+```ruby
+Item.count(conditions: { color: "red" })
+# 4.0: 2 (plus the deprecation warning)
+# 4.1: 4, every row
+
+Item.maximum(:price, group: :color)
+# 4.0: {"blue"=>30, "red"=>20}
+# 4.1: 30, a scalar
+```
+
+A test that asserts on the number will catch it; code that only renders the number will not.
+
+**Detection Pattern:**
+```ruby
+Item.count(conditions: { color: "red" })
+Item.count(:id, :conditions => ["color = ?", color])
+Item.maximum(:price, group: :color)
+owner.items.sum(:price, joins: :orders, conditions: { paid: true })
+Item.count(select: "DISTINCT items.owner_id")
+```
+
+**Fix:**
+```ruby
+# BEFORE
+Item.count(conditions: { color: "red" })
+Item.maximum(:price, group: :color)
+owner.items.sum(:price, joins: :orders, conditions: { paid: true })
+Item.count(select: "DISTINCT items.owner_id")
+
+# AFTER
+Item.where(color: "red").count
+Item.group(:color).maximum(:price)   # still a Hash keyed by group
+owner.items.joins(:orders).where(paid: true).sum(:price)
+Item.select("DISTINCT items.owner_id").count
+```
+
+The chained form works on 3.2, 4.0 and 4.1. A call that also passes `distinct: true` loses that option at 4.1 as well, with or without the gem. Move it to `.distinct` in the same edit: `Item.count(:owner_id, conditions: c, distinct: true)` becomes `Item.where(c).distinct.count(:owner_id)`.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### MultiJSON Removed from Rails
@@ -711,6 +756,7 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 13. Remove MultiJSON usage or add it back to the `Gemfile` explicitly.
 14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
 15. Move `update_all(updates, conditions)` conditions into a `where` chain.
+15. Move finder options on `count` / `sum` / `maximum` / ... (`conditions:`, `joins:`, `group:`) onto chained scopes.
 
 ### Phase 6: Testing
 - Run full test suite.
@@ -732,6 +778,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `NoMethodError: undefined method 'find_all_by_email'` | "Dynamic Finders Removed" — rewrite as `where(email: email)`, or `activerecord-deprecated_finders` temporarily |
 | `NoMethodError` on `find_all_by_*` (or another bridged call) with `activerecord-deprecated_finders` in the Gemfile | "Dynamic Finders Removed": add `require: 'active_record/deprecated_finders'` to the gem line |
 | `ArgumentError: wrong number of arguments (2 for 1)` from `update_all` | "`update_all` With a Conditions Argument Removed": move the conditions into `where(...)` |
+| `count(conditions: ...)` returns the total row count; `maximum(:col, group: ...)` returns a scalar instead of a Hash | "Calculations Silently Ignore Finder Options": chain `where` / `joins` / `group` before the calculation |
 | Query returns zero rows after upgrade | "`default_scope` Chains with Other Scopes" — use `unscope(where: :col)` or `rewhere` |
 | `ActionController::InvalidAuthenticityToken` in controller tests on JS endpoints | "CSRF Protection Now Covers GET with JS Responses" — use `xhr :verb, :action` |
 | `flash.to_hash.except(:notice)` silently keeps `:notice` | "Flash Message Keys Are Strings" — use `"notice"` |

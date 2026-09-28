@@ -106,6 +106,19 @@ upgrade_findings:
       fix: "Move the conditions into a where chain: `Model.update_all(updates, conditions)` becomes `Model.where(conditions).update_all(updates)`; `update_all(updates, conditions, limit: 10, order: :id)` becomes `where(conditions).order(:id).limit(10).update_all(updates)`. Keep the condition's shape as written (hash, string, or array). The chained form works on Rails 3.2, 4.0 and 4.1, so the rewrite can ship before the bump. Loading activerecord-deprecated_finders on 4.1 restores the old form with a warning, but only with an explicit `require: \"active_record/deprecated_finders\"` in the Gemfile"
       variable_name: "UPDATE_ALL_WITH_CONDITIONS"
 
+    - name: "Calculation with finder options (count / sum / maximum / ... with conditions:, joins:, group:)"
+      kind: breaking
+      pattern: "\\.(count|sum|average|minimum|maximum|calculate)\\([^)]*(?<!\\w):?(conditions|include|joins|group|order|limit|offset|select|having|from|readonly|lock)(:|\\s*=>)"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "spec/"
+        - "test/"
+      explanation: "On Rails 4.0, `count`, `sum`, `average`, `minimum`, `maximum` and `calculate` accept finder options (`:conditions`, `:joins`, `:group`, `:select`, `:order`, `:include`, ...) only because activerecord-deprecated_finders, a 4.0 dependency, overrides `Relation#calculate`, applies the options as a scope, and warns `Relation#calculate with finder options is deprecated`. Rails 4.1 drops that dependency, and core 4.1 still accepts the options hash but never reads it. Nothing raises: the options are silently ignored. `Item.count(conditions: { color: \"red\" })` counts every row, `maximum(:price, group: :color)` returns one scalar instead of a Hash keyed by group, and `sum(:price, joins: ...)` sums without the join. The pattern flags a calculation call whose arguments contain one of the finder option keys, in `key:` or `:key =>` form, including calls split across lines. It misses a call where a nested parenthesis comes before the first option key, e.g. `count(foo(x), conditions: c)`. `:distinct` is a different case, see DISTINCT_COUNT_OPTION"
+      fix: "Apply each option as a chained scope before the calculation and keep the column argument as written: `count(conditions: c)` becomes `where(c).count`; `maximum(:price, group: :color)` becomes `group(:color).maximum(:price)` (still a Hash); `sum(:price, joins: :orders, conditions: c)` becomes `joins(:orders).where(c).sum(:price)`; `count(select: \"DISTINCT items.id\")` becomes `select(\"DISTINCT items.id\").count`. The chained form works on Rails 3.2, 4.0 and 4.1. Loading activerecord-deprecated_finders on 4.1 restores the old behavior with a warning, but only with an explicit `require: \"active_record/deprecated_finders\"` in the Gemfile"
+      variable_name: "CALCULATE_FINDER_OPTIONS"
+
   medium_priority:
     - name: "MultiJSON usage"
       kind: breaking

@@ -60,3 +60,25 @@ UPDATE_ALL_WITH_CONDITIONS:
     - "Item.update_all(updates.join(\",\"))"
     - "Item.update_all(price:0, color: \"blue\")"
     - "Item.where(id: ids).update_all(updates)"
+
+CALCULATE_FINDER_OPTIONS:
+  # A call split across lines (`count(:id,\n  conditions: c)`) is reached by
+  # the scanner, which matches file content; fixtures are single lines.
+  match:
+    - "Item.count(conditions: { color: \"red\" })"
+    - "Item.count(:id, :conditions => [\"color = ?\", color])"
+    - "Item.maximum(:price, group: :color)"
+    - "owner.items.sum(:price, joins: :orders, conditions: { paid: true })"
+    - "Item.minimum(\"items.price\", joins: \"LEFT JOIN orders ON orders.item_id = items.id\")"
+    - "Item.count(select: \"DISTINCT items.owner_id\")"
+    - "Item.average(:price, :include => :owner)"
+    - "Item.calculate(:sum, :price, having: \"SUM(price) > 10\")"
+  no_match:
+    - "Item.where(color: \"red\").count"
+    - "Item.group(:color).maximum(:price)"
+    - "Item.count(:owner_id, distinct: true)"
+    - "Item.count(\"DISTINCT items.owner_id\")"
+    - "Item.sum(:order_total)"
+    - "Item.count(:group_id)"
+    - "Item.maximum(:price, sub_group: :color)"
+    - "[1, 2, 3].sum"
