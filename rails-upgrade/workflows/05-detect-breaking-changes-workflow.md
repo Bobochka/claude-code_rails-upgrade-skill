@@ -11,7 +11,8 @@
 
 ## Outputs
 
-- `tmp/pattern-scan.json`: the scanner's JSON for this hop (per pattern: status, kind, priority, explanation, fix, sites with file:line; a `summary` block with the counts). Workflow 08 fills the report from it
+- `tmp/pattern-scan.json`: the scanner's JSON for this hop (per pattern: status, kind, priority, explanation, fix, `prereqs:`, sites with file:line; a `summary` block with the counts). Absent when the scanner could not run. Workflow 08 fills the report from it
+- A findings review note: sites dropped as false positives in Step 3 (pattern, file:line, why) and the prereq gem bumps from Step 1
 - All findings compiled into structured data, with file paths and line numbers, grouped by `kind` and sub-ordered by `priority`
 
 ## Gates (must be true before the next workflow that runs)
@@ -89,11 +90,11 @@ This makes the cascade explicit in the report — readers see "bump rspec-rails 
 From the app root, run the scanner with the app's Ruby (it is stdlib only and runs on Ruby 2.1 and later, so no Bundler is needed):
 
 ```bash
-ruby <skill>/detection-scripts/scan_patterns.rb --format json > tmp/pattern-scan.json
+ruby <skill>/detection-scripts/scan_patterns.rb --format json --output tmp/pattern-scan.json
 ruby <skill>/detection-scripts/scan_patterns.rb --summary
 ```
 
-The JSON file is the record Workflow 08 reads. Read the `--summary` output here, not the full detail: on a large app the full markdown runs to tens of thousands of tokens. For the per-site table of the patterns that fired, run `--only VAR1,VAR2` for a few at a time.
+The JSON file is the record Workflow 08 reads. `--output` creates `tmp/` if the app has none, deletes any earlier file first and writes the new one only when the scan succeeds, so after a failed run there is no file rather than a stale or empty one. Read the `--summary` output here, not the full detail: on a large app the full markdown runs to tens of thousands of tokens. For the per-site table of the patterns that fired, run `--only VAR1,VAR2` for a few at a time.
 
 `<skill>` is this skill's directory, the one holding `SKILL.md`. With no arguments the script reads the current Rails version from `Gemfile.lock` and scans the next hop listed in `version-guides/` (4.0 -> 4.1). `Gemfile.lock` stays on the current version while `Gemfile.next.lock` carries the target, so the default is right for the usual flow. Pass `--target X.Y` when `Gemfile.lock` already pins the target version, or to scan a later hop of a multi-hop plan. When the next hop has no patterns file (6.0 -> 6.1), the script stops and says so rather than scanning the following hop's patterns.
 
@@ -117,7 +118,7 @@ If Ruby cannot run in the app's environment at all, fall back to the Grep tool: 
 
 - **UNSCANNED** is "could not scan", not "clean". For each one, confirm the path does not exist in this app (a Gemfile-only pattern in an app without that file) or Grep the app's real layout by hand.
 - **Suppressed by exclude**: `exclude:` is tested on the lines a match spans, so a real hit that shares a line with the excluded form is dropped with it. Re-run with `--show-suppressed` when the count is non-zero and look at any entry whose excluded form can sit next to a real hit.
-- **False positives**: a pattern flags text, not behavior. Read the matched line before carrying a site into the report (Step 5), and drop sites that are not the API the pattern describes (a method that only shares a name prefix, a comment, a string).
+- **False positives**: a pattern flags text, not behavior. Read the matched line before carrying a site into the report (Step 5), and drop sites that are not the API the pattern describes (a method that only shares a name prefix, a comment, a string). Record each dropped site (pattern, file:line, why) in the findings review note; do not edit the JSON. Workflow 08 reports the kept sites and says how many were dropped.
 
 ---
 
@@ -198,7 +199,7 @@ Read:
 
 ### Step 6: Return Findings
 
-Pass `tmp/pattern-scan.json`, plus anything found by hand in Step 3, to the report generation step.
+Pass `tmp/pattern-scan.json` and the findings review note (dropped false positives, prereq gem bumps from Step 1, anything found by hand in Step 3) to the report generation step. When the scanner could not run (Grep fallback, or a hop with no patterns file), pass the Grep findings compiled as in Step 4 instead, and say why the scanner did not run.
 
 ---
 

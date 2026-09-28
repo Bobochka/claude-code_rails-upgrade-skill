@@ -13,7 +13,7 @@
 #   ruby <skill>/detection-scripts/scan_patterns.rb --patterns path/to/rails-70-patterns.yml
 #   ruby <skill>/detection-scripts/scan_patterns.rb --summary   # summary table only
 #   ruby <skill>/detection-scripts/scan_patterns.rb --only VAR1,VAR2   # detail for these patterns only
-#   ruby <skill>/detection-scripts/scan_patterns.rb --format json
+#   ruby <skill>/detection-scripts/scan_patterns.rb --format json --output tmp/pattern-scan.json
 #   ruby <skill>/detection-scripts/scan_patterns.rb --self-test
 #
 # Without --target or --patterns, the current Rails version is read from the
@@ -471,7 +471,8 @@ def render_json(meta, results)
       "patterns_checked" => results.length,
       "patterns_fired" => found.length,
       "sites" => found.inject(0) { |t, r| t + r[:hits].length },
-      "files" => found.flat_map { |r| r[:hits].map(&:first) }.uniq.length,
+      # Path-only sites (a directory that exists, no line) are not files.
+      "files" => found.flat_map { |r| r[:hits].select { |h| h[1] }.map(&:first) }.uniq.length,
       "by_kind" => by_kind,
       "unscanned" => results.select { |r| status_of(r) == "unscanned" }.map { |r| r[:variable] },
       "suppressed" => results.select { |r| status_of(r) == "suppressed" }.map { |r| r[:variable] }
@@ -483,6 +484,9 @@ def render_json(meta, results)
         "explanation" => r[:explanation], "fix" => r[:fix], "prereqs" => r[:prereqs],
         "files_scanned" => r[:files_scanned],
         "status" => status_of(r),
+        # true when the entry fires on a path existing (pattern: ""); its sites
+        # have "line" => null and "file" is the search path.
+        "path_only" => r[:path_only] ? true : false,
         "sites" => r[:hits].map { |f, l, t, st| { "file" => f, "line" => l, "start_line" => st || l, "text" => t } },
         "suppressed" => r[:suppressed].map { |f, l, t, st| { "file" => f, "line" => l, "start_line" => st || l, "text" => t } }
       }
@@ -506,7 +510,8 @@ def run_scan(patterns_path, root)
         :bucket_label => bucket == "fix_before_bump" ? "Fix before bump" : "Fix when ready",
         :explanation => entry["explanation"], :fix => entry["fix"], :prereqs => entry["prereqs"],
         :exclude => entry["exclude"], :search_paths => entry["search_paths"],
-        :files_scanned => r[:files_scanned], :hits => r[:hits], :suppressed => r[:suppressed]
+        :files_scanned => r[:files_scanned], :hits => r[:hits], :suppressed => r[:suppressed],
+        :path_only => r[:path_only]
       }
     end
   end
@@ -615,10 +620,16 @@ if $PROGRAM_NAME == __FILE__
     o.on("--summary", "print the summary table only, no per-site detail") { opts[:summary] = true }
     o.on("--only VARS", "per-site detail only for these variable_names (comma-separated)") { |v| opts[:only] = v.split(",").map(&:strip) }
     o.on("--show-suppressed", "list the sites dropped by each entry's exclude:") { opts[:show_suppressed] = true }
+    o.on("--output FILE", "write to FILE instead of stdout (creates its directory; removed first, written only on success)") { |v| opts[:output] = v }
     o.on("--self-test", "run built-in assertions and exit") { opts[:self_test] = true }
   end.parse!
 
   self_test if opts[:self_test]
+
+  # Remove the old output before anything can abort, so a failed run never
+  # leaves a stale or half-written file for the next workflow to read.
+  output = opts[:output] ? File.expand_path(opts[:output]) : nil
+  File.delete(output) if output && File.file?(output)
 
   root = File.expand_path(opts[:root])
   abort("scan_patterns: --root #{opts[:root].inspect} is not a directory") unless File.directory?(root)
@@ -650,9 +661,25 @@ if $PROGRAM_NAME == __FILE__
   end
 
   results, roots = run_scan(patterns, root)
+  if opts[:only]
+    unknown = opts[:only] - results.map { |r| r[:variable] }
+    unless unknown.empty?
+      abort("scan_patterns: --only names no pattern in #{File.basename(patterns)}: #{unknown.join(', ')} " \
+            "(use the variable_name, e.g. #{results.first && results.first[:variable]})")
+    end
+  end
   meta = {
     :from => current, :to => target, :root => root, :hop_source => hop_source, :modular_roots => roots,
     :patterns_rel => patterns.sub(%r{\A.*/(detection-scripts/)}, '\1')
   }
-  print(opts[:format] == "json" ? render_json(meta, results) : render_markdown(meta, results, opts))
+  text = opts[:format] == "json" ? render_json(meta, results) : render_markdown(meta, results, opts)
+  if output
+    FileUtils.mkdir_p(File.dirname(output))
+    tmp = "#{output}.tmp#{Process.pid}"
+    File.write(tmp, text)
+    File.rename(tmp, output)
+    $stderr.puts "scan_patterns: wrote #{output}"
+  else
+    print text
+  end
 end

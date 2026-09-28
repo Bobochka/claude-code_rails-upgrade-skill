@@ -55,7 +55,7 @@ The warnings the current version emits, collected before any dual-boot work.
 | Pattern | Kind | Priority | Sites | Files |
 |---------|------|----------|-------|-------|
 {PATTERN_SCAN_ROWS}
-<!-- One row per pattern that matched, same order as the entries below. When none matched, replace the table with "No pattern matched." -->
+<!-- One row per pattern that matched, same order as the entries below. Sites: the kept count, plus "(N dropped as false positives)" when any were. When none matched, replace the table with "No pattern matched." When the scanner did not run, say how the patterns were searched instead (for example "searched line by line with grep; calls split across lines may be missed"). -->
 
 - Could not be scanned (no files at their paths in this app): {PATTERNS_NOT_SCANNED}.
 - Every site dropped by the pattern's own exclusion: {PATTERNS_ALL_SUPPRESSED}.
