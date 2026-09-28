@@ -338,6 +338,7 @@ The app fails to boot or eager load, and every test that touches the model fails
 has_many :tags, through: :taggings, readonly: false
 has_many :line_items, :through => :orders, :readonly => true
 has_and_belongs_to_many :roles, readonly: true
+belongs_to :account, readonly: true
 ```
 
 **Fix:**
@@ -346,14 +347,16 @@ has_and_belongs_to_many :roles, readonly: true
 has_many :tags, through: :taggings, readonly: false
 has_many :line_items, :through => :orders, :readonly => true
 has_and_belongs_to_many :roles, readonly: true
+belongs_to :account, readonly: true
 
 # AFTER
 has_many :tags, through: :taggings
 has_many :line_items, -> { readonly }, through: :orders
 has_and_belongs_to_many :roles, -> { readonly }
+belongs_to :account, -> { readonly }
 ```
 
-`readonly: false` can usually be deleted. Rails 4.1 removed `implicit_readonly`, so records loaded through a join are no longer marked readonly and there is nothing left to undo. If the association must stay writable on 4.0 as well, write `-> { readonly(false) }` instead. The lambda form works on 4.0 and 4.1. As a short-term bridge, `gem 'activerecord-deprecated_finders'` restores `:readonly` on `has_many`. It does not fix `has_and_belongs_to_many`.
+`readonly: false` can usually be deleted. Rails 4.1 removed `implicit_readonly`, so records loaded through a join are no longer marked readonly and there is nothing left to undo. If the association must stay writable on 4.0 as well, write `-> { readonly(false) }` instead. The lambda form works on 4.0 and 4.1. As a short-term bridge, `gem 'activerecord-deprecated_finders'` restores `:readonly` on `has_many` / `has_one` / `belongs_to`. It does not fix `has_and_belongs_to_many`.
 
 ---
 

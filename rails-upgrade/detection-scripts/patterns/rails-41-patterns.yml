@@ -114,12 +114,12 @@ upgrade_findings:
 
     - name: "Association :readonly option"
       kind: breaking
-      pattern: "(has_many|has_and_belongs_to_many).*:?readonly(:|\\s*=>)"
+      pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many).*:?readonly(:|\\s*=>)"
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.1 no longer depends on activerecord-deprecated_finders, the gem that kept :readonly working (with a deprecation warning) on 4.0. Without it, has_many (with or without :through) raises `ArgumentError: Unknown key: :readonly` when the model class loads, so boot, eager loading and every test that touches the model fail. has_and_belongs_to_many does not raise: 4.1 rebuilds it as has_many :through and passes on only a fixed list of options, so :readonly is dropped with no warning, with or without the gem. belongs_to and has_one raise on :readonly too, but this pattern only covers the collection macros. The pattern only sees options on the same line as the macro"
-      fix: "readonly: true becomes a scope lambda: has_many :tags, -> { readonly }, through: :taggings. readonly: false can usually just be deleted: Rails 4.1 removed implicit_readonly, so records loaded through a join are no longer marked readonly and there is nothing left to undo. If the association needs to stay writable on 4.0 too, use -> { readonly(false) } instead. The lambda form works on 4.0 and 4.1. As a short-term bridge, gem 'activerecord-deprecated_finders' restores :readonly on has_many; it does not help habtm"
+      explanation: "Rails 4.1 no longer depends on activerecord-deprecated_finders, the gem that kept :readonly working (with a deprecation warning) on 4.0. Without it, has_many (with or without :through), has_one and belongs_to raise `ArgumentError: Unknown key: :readonly` when the model class loads, so boot, eager loading and every test that touches the model fail. has_and_belongs_to_many does not raise: 4.1 rebuilds it as has_many :through and passes on only a fixed list of options, so :readonly is dropped with no warning, with or without the gem. The pattern only sees options on the same line as the macro"
+      fix: "readonly: true becomes a scope lambda: has_many :tags, -> { readonly }, through: :taggings. readonly: false can usually just be deleted: Rails 4.1 removed implicit_readonly, so records loaded through a join are no longer marked readonly and there is nothing left to undo. If the association needs to stay writable on 4.0 too, use -> { readonly(false) } instead. The lambda form works on 4.0 and 4.1. As a short-term bridge, gem 'activerecord-deprecated_finders' restores :readonly on has_many / has_one / belongs_to; it does not help habtm"
       variable_name: "ASSOCIATION_READONLY"
 
   medium_priority:
