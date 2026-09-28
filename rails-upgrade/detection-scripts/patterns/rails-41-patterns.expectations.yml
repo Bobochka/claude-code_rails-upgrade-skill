@@ -56,3 +56,20 @@ ABSTRACT_CONTROLLER_LAYOUTS:
     - "  include(NextRails.next? ? ActionView::Layouts : AbstractController::Layouts)"
     - "  include AbstractController::Rendering"
     - "  include AbstractController::LayoutsHelper"
+
+ACTS_AS_LIST_PRE_0_3:
+  match:
+    - "    acts_as_list (0.1.6)"
+    - "    acts_as_list (0.2.0)"
+    - "gem 'acts_as_list', '0.1.6'"
+    - "gem \"acts_as_list\", \"~> 0.2.0\""
+    - "gem 'acts_as_list', '~> 0.1'"
+  no_match:
+    - "    acts_as_list (0.3.0)"
+    - "    acts_as_list (0.7.7)"
+    - "    acts_as_list (0.9.19)"
+    - "    acts_as_list (1.0.4)"
+    - "gem 'acts_as_list'"
+    - "gem 'acts_as_list', '~> 0.7.7'"
+    - "    active_admin-acts_as_list (0.0.8)"
+    - "    acts_as_list_mongoid (0.2.5)"

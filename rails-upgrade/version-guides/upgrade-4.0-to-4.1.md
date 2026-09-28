@@ -61,6 +61,29 @@ If you cannot migrate callers now, restore the bridge gem:
 gem 'activerecord-deprecated_finders'
 ```
 
+**Gems that still call the removed finder forms:** the bridge also carried `find(:first, :conditions => ...)`, `find(:all, ...)` and the two-argument `update_all(updates, conditions)`. Old gem versions that call these break at runtime on 4.1 even though they install and load fine. The known case is `acts_as_list` below 0.3.0: 0.1.x and 0.2.0 look up neighbours with `find(:first, :conditions => ...)`, so creating, moving or removing a list item raises:
+
+```
+ActiveRecord::RecordNotFound: Couldn't find all Items with 'id': (first, {:conditions=>"\"items\".\"list_id\" = 1", :order=>"position DESC"})
+```
+
+Detect it on the resolved version in the lockfile, since a bare `gem 'acts_as_list'` carries none:
+```
+# Gemfile.lock
+    acts_as_list (0.1.6)
+```
+
+Fix it with one constraint that resolves on both 4.0 and 4.1:
+```ruby
+# BEFORE
+gem 'acts_as_list'           # resolves to 0.1.6
+
+# AFTER
+gem 'acts_as_list', '~> 0.7.7'
+```
+
+Several releases separate 0.1.x from 0.7.x, so read the gem's changelog and run the specs that cover list ordering. Keeping `activerecord-deprecated_finders` in the 4.1 bundle also keeps the old version working, with deprecation warnings.
+
 ---
 
 #### `return` Inside Inline Callback Blocks
@@ -752,6 +775,7 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
 15. Move `:confirm` on `link_to` / `button_to` / `submit_tag` / `f.submit` under `data: { confirm: ... }`.
 15. Switch `include AbstractController::Layouts` to `ActionView::Layouts` (branch on `NextRails.next?` while both versions boot).
+15. Upgrade `acts_as_list` below 0.3.0 (check the lockfile) to `~> 0.7.7`.
 
 ### Phase 6: Testing
 - Run full test suite.
@@ -771,6 +795,7 @@ Error → section lookup for the most common errors encountered during this upgr
 |-------|-----|
 | `NameError: uninitialized constant MultiJSON` | "MultiJSON Removed from Rails" — add `gem 'multi_json'` or move to `to_json` / `JSON.parse` |
 | `NoMethodError: undefined method 'find_all_by_email'` | "Dynamic Finders Removed" — rewrite as `where(email: email)`, or `activerecord-deprecated_finders` temporarily |
+| `ActiveRecord::RecordNotFound: Couldn't find all ... with 'id': (first, {:conditions=>...})` from inside a gem | "Dynamic Finders Removed"; upgrade the gem (e.g. `acts_as_list` to 0.3+) |
 | Query returns zero rows after upgrade | "`default_scope` Chains with Other Scopes" — use `unscope(where: :col)` or `rewhere` |
 | `ActionController::InvalidAuthenticityToken` in controller tests on JS endpoints | "CSRF Protection Now Covers GET with JS Responses" — use `xhr :verb, :action` |
 | `flash.to_hash.except(:notice)` silently keeps `:notice` | "Flash Message Keys Are Strings" — use `"notice"` |
