@@ -809,9 +809,9 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 13. Remove MultiJSON usage or add it back to the `Gemfile` explicitly.
 14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
 15. Wrap every non-callable `scope` body in a lambda (`scope :active, -> { where(active: true) }`).
-15. Pass a block to every `default_scope` that takes a relation or a hash (`default_scope { where(deleted_at: nil) }`).
-15. Rename any scope whose name matches an Active Record class method (`none`, `all`, `count`, ...), or delete it if the built-in does the same job.
-15. Replace `:finder_sql` / `:counter_sql` association options with a scope or a `find_by_sql` method.
+16. Pass a block to every `default_scope` that takes a relation or a hash (`default_scope { where(deleted_at: nil) }`).
+17. Rename any scope whose name matches an Active Record class method (`none`, `all`, `count`, ...), or delete it if the built-in does the same job.
+18. Replace `:finder_sql` / `:counter_sql` association options with a scope or a `find_by_sql` method.
 
 ### Phase 6: Testing
 - Run full test suite.
