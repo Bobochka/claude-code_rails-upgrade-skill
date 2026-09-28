@@ -794,6 +794,72 @@ every asset.
 
 ---
 
+#### Sass CSS Compressor Now Parses Minified Stylesheets
+
+**What Changed:**
+sass-rails 3.2.6 installed `Sass::Rails::CssCompressor` only when `config.assets.compress`
+was set, and it returned the CSS untouched unless the bundle had more than two newlines:
+
+```ruby
+def compress(css)
+  if css.count("\n") > 2
+    Sass::Engine.new(css, ...).render
+  else
+    css
+  end
+end
+```
+
+sass-rails 4.0.0 replaces that with `config.assets.css_compressor ||= :sass` in every
+environment except development, and `:sass` is `Sprockets::SassCompressor`, which sends
+every bundle through `Sass::Engine` with no guard. A one-line vendored `.min.css` that
+3.2 passed through is now parsed as SCSS, and Ruby Sass rejects some valid CSS:
+
+```
+Sass::SyntaxError: "var(--gap)" is not a number for `max'
+```
+
+That aborts `assets:precompile`. The compressor is now installed in the test environment
+too, so a feature spec whose page loads the stylesheet gets the same error from the asset
+request. The compressor runs per bundle: a minified file pulled into a larger manifest
+with `*= require` was already parsed on 3.2, so the files that change behavior are the
+ones precompiled or linked on their own. An app that sets `config.assets.css_compressor`
+itself is not affected, because sass-rails only fills in an unset value.
+
+**Detection Pattern:**
+```bash
+# .css files of three lines or fewer with a 300+ character line
+find app/assets/stylesheets lib/assets/stylesheets vendor/assets/stylesheets -name "*.css" \
+  -exec awk 'END { if (NR <= 3 && max >= 300) print FILENAME } { if (length($0) > max) max = length($0) }' {} \;
+```
+
+**Fix:**
+First precompile the 4.0 bundle in a production-like environment to see whether a flagged
+file fails at all. If one does, keep the 3.2 guard by assigning a compressor object, which
+stops sass-rails' `||=` from installing its own:
+
+```ruby
+# BEFORE: nothing set, sass-rails 4.0 installs the unguarded :sass compressor
+
+# AFTER: config/application.rb, valid on 3.2 and 4.0
+config.assets.css_compressor = Class.new do
+  def compress(css)
+    return css unless css.count("\n") > 2
+
+    Sass::Engine.new(css, syntax: :scss, style: :compressed,
+                          cache: false, read_cache: false).render
+  end
+end.new
+```
+
+Other options are bumping the `sass` gem (3.7.4 renders `max(var(--gap), 1px)`, 3.4
+does not) or switching to a CSS-only compressor. Do not assign an object whose `compress`
+returns its input unchanged: precompile goes green, production CSS silently stops being
+minified, and nothing reports it. Compare the size of the precompiled `application-*.css`
+with the 3.2 build.
+
+---
+
 #### Bidirectional `dependent: :destroy` Now Recurses Forever
 
 **What Changed:**
@@ -1230,6 +1296,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `ActiveRecord::ImmutableRelation` | "`ActiveRecord::ImmutableRelation` Error" — use `.distinct.count` |
 | Controller specs don't see custom headers | "Test Request Headers API Changed" — use `request.headers.merge!` |
 | Images, icons or fonts 404 in production, fine in tests | "Precompile No Longer Writes Non-Digest Asset Copies": replace literal `/assets/` paths with asset helpers |
+| `Sass::SyntaxError` from `assets:precompile` in a `.min.css` file | "Sass CSS Compressor Now Parses Minified Stylesheets": restore the newline guard |
 
 ---
 
