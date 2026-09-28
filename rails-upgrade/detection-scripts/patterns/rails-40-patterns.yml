@@ -107,17 +107,6 @@ upgrade_findings:
       fix: "Defer to dual-boot and branch the association definition with `NextRails.next?`. Common 3.2 use case is `finder_sql: \"SELECT id FROM x WHERE id IS NULL\"` as a deliberate always-empty stub for `accepts_nested_attributes_for`; preserve that intent in the dual-boot branch. FK gotcha: the scope-form replacement (`has_many :foo, -> { none }, class_name: \"Foo\"`) restores Rails' default FK predicate. Rails 4 computes `<owner_class_name>_id` as the FK column on the associated table — for self-referential associations or any case where the implied FK column does not exist, accessing the association raises an unknown-column SQL error even when the scope returns no rows. Pin `foreign_key:` and `primary_key:` to existing columns on both sides; for an always-empty stub used purely by `accepts_nested_attributes_for`, `foreign_key: :id, primary_key: :id` is a safe default"
       variable_name: "FINDER_SQL"
 
-    - name: "Dynamic finders (find_last_by_*)"
-      kind: "deprecation"
-      pattern: "find_last_by_"
-      exclude: ""
-      search_paths:
-        - "app/"
-        - "lib/"
-      explanation: "Dynamic finders like find_last_by_* are deprecated in Rails 4.0 but continue to work because Rails 4.0 ships activerecord-deprecated_finders as a default dependency. The finders are actually removed in Rails 4.1, when the bridge gem is no longer bundled"
-      fix: "Two valid paths. (1) Defer: leave the calls in place for the 3.2 → 4.0 hop and rely on the bundled activerecord-deprecated_finders gem; rewrite at the 4.0 → 4.1 hop. (2) Pre-bump cleanup: replace find_last_by_column(val) with where(column: val).last. Both forms work on Rails 3.2 and 4.0+, so the rewrite is backwards-compatible"
-      variable_name: "FIND_LAST_BY"
-
     - name: "Association :readonly option on through"
       kind: "deprecation"
       pattern: "(has_many|has_and_belongs_to_many).*:?readonly(:|\\s*=>)"
@@ -589,6 +578,19 @@ upgrade_findings:
       explanation: "Rails 4.0 took find_or_initialize_by_* out of Active Record. They keep working on 4.0 because activerecord 4.0 depends on activerecord-deprecated_finders, which adds them back and prints `DEPRECATION WARNING: This dynamic method is deprecated. Please use e.g. Post.find_or_initialize_by(name: 'foo') instead.` on every call. Rails 4.1 drops that dependency and the call raises NoMethodError. The replacement the warning suggests, `find_or_initialize_by(name: v)`, does not exist on Rails 3.2 (NoMethodError there), so it cannot ship before the bump. The regex skips a `def find_or_initialize_by_x` definition, a `:find_or_initialize_by_x` symbol and a `\"#find_or_initialize_by_x\"` spec label. A call to an app-defined method whose name starts with find_or_initialize_by_ still matches, so look for a matching `def` before rewriting"
       fix: "Rewrite with `where(...).first_or_initialize`, which works on Rails 3.2 and 4.0: `Model.find_or_initialize_by_col(v)` becomes `Model.where(col: v).first_or_initialize`, `find_or_initialize_by_a_and_b(x, y)` becomes `where(a: x, b: y).first_or_initialize`, and a block passes through unchanged. When the call passes extra attributes for the new record (`find_or_initialize_by_col(v, other: 1)`), pass them to it: `where(col: v).first_or_initialize(other: 1)`. After the bump, `find_or_initialize_by(col: v)` is the shorter spelling"
       variable_name: "FIND_OR_INITIALIZE_BY"
+
+    - name: "Dynamic finders (find_last_by_*)"
+      kind: "deprecation"
+      pattern: "(?<![\\w:\"'#])(?<!def )(?<!def self\\.)find_last_by_\\w+"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "spec/"
+        - "test/"
+      explanation: "Rails 4.0 took find_last_by_* out of Active Record: the v4.0.13 dynamic matchers register only find_by_* and find_by_*!. The call keeps working on 4.0 because activerecord 4.0 depends on activerecord-deprecated_finders, which adds the matcher back and prints `DEPRECATION WARNING: This dynamic method is deprecated. Please use e.g. Post.where(...).last instead.` on every call. Rails 4.1 drops that dependency and the call raises NoMethodError. The regex skips a `def find_last_by_x` definition, a `:find_last_by_x` symbol (a stub or respond_to? check) and a `\"#find_last_by_x\"` spec label. A call to an app-defined method whose name starts with find_last_by_ still matches, so look for a matching `def` before rewriting"
+      fix: "Replace `Model.find_last_by_col(v)` with `Model.where(col: v).last`, and `find_last_by_a_and_b(x, y)` with `where(a: x, b: y).last`. Both work on Rails 3.2 and 4.0, so the rewrite can ship before the bump. Rails 3.2 and the 4.0 bridge gem both implement the finder as `where(...).last`, so the rewrite returns the same row. An options hash in the last argument (`find_last_by_col(v, order: \"x\")`) becomes chained calls: `where(col: v).order(\"x\").last`"
+      variable_name: "FIND_LAST_BY"
 
   low_priority:
     - name: "request.env.merge! in tests"

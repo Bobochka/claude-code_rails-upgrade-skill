@@ -165,8 +165,11 @@ FIND_OR_INITIALIZE_BY:
 FIND_LAST_BY:
   match:
     - "User.find_last_by_email(email)"
+    - "    visit = member.visits.find_last_by_status_and_kind(\"done\", \"exam\")"
   no_match:
     - "User.where(email: email).last"
+    - "  def self.find_last_by_date(date)"
+    - "    allow(Visit).to receive(:find_last_by_status).and_return(nil)"
 
 ASSOCIATION_READONLY:
   match:
