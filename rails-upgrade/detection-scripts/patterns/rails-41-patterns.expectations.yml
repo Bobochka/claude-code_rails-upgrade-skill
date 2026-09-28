@@ -57,6 +57,7 @@ ASSOCIATION_UNIQ:
   match:
     - "  has_many :tags, through: :taggings, uniq: true"
     - "  has_and_belongs_to_many :roles, :uniq => true"
+    - "  has_one :primary_tag, through: :primary_tagging, uniq: true"
   no_match:
     - "  has_many :tags, -> { distinct }, through: :taggings"
     - "  has_many :tags, -> { uniq }, through: :taggings"

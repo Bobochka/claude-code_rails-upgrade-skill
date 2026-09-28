@@ -104,12 +104,12 @@ upgrade_findings:
 
     - name: "Association :uniq option"
       kind: breaking
-      pattern: "(has_many|has_and_belongs_to_many).*:?uniq(:|\\s*=>)"
+      pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many).*:?uniq(:|\\s*=>)"
       exclude: ""
       search_paths:
         - "app/models/"
-      explanation: "Rails 4.1 no longer depends on activerecord-deprecated_finders, the gem that kept :uniq working (with a deprecation warning) on 4.0. Without it, has_many raises `ArgumentError: Unknown key: :uniq` when the model class loads, so boot, eager loading and every test that touches the model fail. has_and_belongs_to_many does not raise: 4.1 rebuilds it as has_many :through and passes on only a fixed list of options, so :uniq is dropped with no warning and the query loses its DISTINCT, with or without the gem. Duplicate join rows then come back as duplicate records. The pattern only sees options on the same line as the macro"
-      fix: "Move it into a scope lambda: has_many :tags, -> { distinct }, through: :taggings. distinct exists on 4.0 (uniq is its alias there), so the rewrite can land before the bump, and the lambda form is the only one that de-duplicates a has_and_belongs_to_many on 4.1. As a short-term bridge, gem 'activerecord-deprecated_finders' restores :uniq on has_many; it does not help habtm"
+      explanation: "Rails 4.1 no longer depends on activerecord-deprecated_finders, the gem that kept :uniq working (with a deprecation warning) on 4.0. Without it, has_many, has_one and belongs_to raise `ArgumentError: Unknown key: :uniq` when the model class loads, so boot, eager loading and every test that touches the model fail. has_and_belongs_to_many does not raise: 4.1 rebuilds it as has_many :through and passes on only a fixed list of options, so :uniq is dropped with no warning and the query loses its DISTINCT, with or without the gem. Duplicate join rows then come back as duplicate records. The pattern only sees options on the same line as the macro"
+      fix: "Move it into a scope lambda: has_many :tags, -> { distinct }, through: :taggings. distinct exists on 4.0 (uniq is its alias there), so the rewrite can land before the bump, and the lambda form is the only one that de-duplicates a has_and_belongs_to_many on 4.1. As a short-term bridge, gem 'activerecord-deprecated_finders' restores :uniq on has_many / has_one / belongs_to; it does not help habtm"
       variable_name: "ASSOCIATION_UNIQ"
 
     - name: "Association :readonly option"

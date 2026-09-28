@@ -289,7 +289,7 @@ The lambda form works on 4.0 and 4.1, so the rewrite can land before the version
 #### Association `:uniq` Option Removed
 
 **What Changed:**
-Rails 4.1 no longer depends on `activerecord-deprecated_finders`, the gem that kept `:uniq` working (with a deprecation warning) on 4.0. Without it, `has_many` rejects the key when the model class loads:
+Rails 4.1 no longer depends on `activerecord-deprecated_finders`, the gem that kept `:uniq` working (with a deprecation warning) on 4.0. Without it, `has_many`, `has_one` and `belongs_to` reject the key when the model class loads:
 
 ```
 ArgumentError: Unknown key: :uniq. Valid keys are: :class_name, :anonymous_class, :foreign_key, ...
@@ -316,7 +316,7 @@ has_many :tags, -> { distinct }, through: :taggings
 has_and_belongs_to_many :roles, -> { distinct }
 ```
 
-`distinct` exists on 4.0 (`uniq` is its alias there), so the rewrite can land before the version bump. As a short-term bridge, `gem 'activerecord-deprecated_finders'` restores `:uniq` on `has_many`. It does not fix `has_and_belongs_to_many`.
+`distinct` exists on 4.0 (`uniq` is its alias there), so the rewrite can land before the version bump. As a short-term bridge, `gem 'activerecord-deprecated_finders'` restores `:uniq` on `has_many` / `has_one` / `belongs_to`. It does not fix `has_and_belongs_to_many`.
 
 ---
 
