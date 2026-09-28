@@ -464,8 +464,9 @@ and `reorder(nil)` is the documented way to clear a default order, so leave them
 The hash form has the same shape of problem. Rails 3.2 had no hash support in `order` at
 all: the hash was serialized into the `ORDER BY` string, the database sorted by nothing
 usable, and rows came back in whatever order it chose. Rails 4.0 reads a hash strictly as
-`{column => direction}` and validates the value against `:asc` / `:desc`, so
-`order(events: :start)` raises. It also only accepts columns on the model's own table, so
+`{column => direction}` and raises `ArgumentError: Direction should be :asc or :desc`
+unless every value is exactly the symbol `:asc` or `:desc`. So `order(events: :start)`,
+`order(name: :DESC)`, `order(name: "desc")` and `order(:position, name: :foo)` all raise. It also only accepts columns on the model's own table, so
 a sort spanning joined tables cannot be written as a hash on 4.0 at all.
 
 **Detection Pattern:**
@@ -480,10 +481,12 @@ grep -rnE "(^|[^A-Za-z0-9_])(re)?order\(\s*\{?\s*:?\w+\s*(:|=>)\s*:\w+" app/ lib
 Reading an `order` association or column (`line_item.order`, `payment.order.total`) is far
 more common than the bug, which is why the bare-call grep requires a relation method after
 it, and why that method name must end there: without the trailing boundary,
-`line_item.order.summary` matches on `sum`. The `:asc` / `:desc` filter is applied to the
-whole line, so a line chaining a bad hash and a good one is filtered out with it; split
-such chains before trusting a clean run. Multi-line hashes cannot be grepped at all, so
-also scan `order(` by hand in query objects and reports. Two shapes stay invisible to both
+`line_item.order.summary` matches on `sum`. The hash grep is a rough first pass: its
+`:asc` / `:desc` filter drops the whole line, so a line chaining a bad hash and a good one
+is filtered out with it, and it cannot see a hash spread over several lines. The skill's
+own pattern checks each value and reads across lines, but it cannot see a hash held in a
+constant or built at runtime (`order(SORT)`), so also scan `order(` by hand in query
+objects and reports. Two shapes stay invisible to both
 the grep and the skill's own pattern: a receiverless `order` inside a scope
 (`scope :recent, -> { order }`), and a bare call followed by an enumerable method rather
 than a relation method (`.order.map { ... }`, `.order.sort_by { ... }`).
