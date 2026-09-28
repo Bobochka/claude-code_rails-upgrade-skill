@@ -813,9 +813,9 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 13. Remove MultiJSON usage or add it back to the `Gemfile` explicitly.
 14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
 15. Replace `.all` on relations and associations with `.to_a` (leave `Model.all` alone).
-15. Change `count` to `count(:all)` on relations that carry a multi-column `select`.
-15. Port association scopes that call `parent_table_name` and any `join_to` monkeypatch to the 4.1 `JoinDependency` API.
-15. Rewrite specs that assert the `RecordNotFound` message text (`with id=` became `with 'id'=`).
+16. Change `count` to `count(:all)` on relations that carry a multi-column `select`.
+17. Port association scopes that call `parent_table_name` and any `join_to` monkeypatch to the 4.1 `JoinDependency` API.
+18. Rewrite specs that assert the `RecordNotFound` message text (`with id=` became `with 'id'=`).
 
 ### Phase 6: Testing
 - Run full test suite.
