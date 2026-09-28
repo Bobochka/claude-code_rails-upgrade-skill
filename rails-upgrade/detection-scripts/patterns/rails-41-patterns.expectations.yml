@@ -76,8 +76,9 @@ UPDATE_ALL_WITH_CONDITIONS:
     - "Item.where(id: ids).update_all(updates)"
 
 CALCULATE_FINDER_OPTIONS:
-  # A call split across lines (`count(:id,\n  conditions: c)`) is reached by
-  # the scanner, which matches file content; fixtures are single lines.
+  # A call split across lines (`count(:id,\n  conditions: c)`) matches only in
+  # the whole-file scanner (detection-scripts/scan_patterns.rb); a line-based
+  # search sees single-line calls only. Fixtures are single lines.
   match:
     - "Item.count(conditions: { color: \"red\" })"
     - "Item.count(:id, :conditions => [\"color = ?\", color])"
