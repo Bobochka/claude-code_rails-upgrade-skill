@@ -76,3 +76,16 @@ JOIN_DEPENDENCY_INTERNALS:
     - "    where(\"#{join.aliased_table_name}.deleted_at IS NULL\")"
     - "  def join_token"
     - "    self.parent_table_names = []"
+
+RECORD_NOT_FOUND_MESSAGE:
+  match:
+    - "      expect(json[\"error\"]).to eq \"Couldn't find Post with id=999\""
+    - "    assert_equal \"Couldn't find Admin::User with id=5\", error.message"
+    - "      expect(response.body).to include(\"Couldn't find all Posts with IDs (1, 2)\")"
+  no_match:
+    # The 4.1 wording.
+    - "      expect(json[\"error\"]).to eq \"Couldn't find Post with 'id'=999\""
+    - "      expect(response.body).to include(\"Couldn't find all Posts with 'id': (1, 2)\")"
+    # App-written message with spaces around the equals sign: not Rails text.
+    - "    raise ActiveRecord::RecordNotFound, \"Couldn't find Invoice with external_ref = #{id}\""
+    - "    expect { Post.find(999) }.to raise_error(ActiveRecord::RecordNotFound)"
