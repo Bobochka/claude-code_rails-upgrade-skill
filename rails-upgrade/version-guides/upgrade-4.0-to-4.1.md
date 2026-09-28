@@ -61,7 +61,7 @@ If you cannot migrate callers now, restore the bridge gem:
 gem 'activerecord-deprecated_finders'
 ```
 
-**Gems that still call the removed finder forms:** the bridge also carried `find(:first, :conditions => ...)`, `find(:all, ...)` and the two-argument `update_all(updates, conditions)`. Old gem versions that call these break at runtime on 4.1 even though they install and load fine. The known case is `acts_as_list` below 0.3.0: 0.1.x and 0.2.0 look up neighbours with `find(:first, :conditions => ...)`, so creating, moving or removing a list item raises:
+**Gems that still call the removed finder forms:** the bridge also carried `find(:first, :conditions => ...)`, `find(:all, ...)` and the two-argument `update_all(updates, conditions)`. Old gem versions that call these break at runtime on 4.1 even though they install and load fine. The known case is `acts_as_list` below 0.3.0. On 0.1.x, adding an item and `move_higher` / `move_lower` go through `find(:first, :conditions => ...)`, and `move_to_top`, `insert_at`, `remove_from_list` and `destroy` go through the two-argument `update_all`, which raises `ArgumentError: wrong number of arguments`. On 0.2.0 only `higher_item` and `lower_item` still call `find(:first, ...)`, so `move_higher`, `move_lower` and those two methods raise, while adding and removing items work. The `find(:first, ...)` calls raise:
 
 ```
 ActiveRecord::RecordNotFound: Couldn't find all Items with 'id': (first, {:conditions=>"\"items\".\"list_id\" = 1", :order=>"position DESC"})
@@ -795,7 +795,7 @@ Error → section lookup for the most common errors encountered during this upgr
 |-------|-----|
 | `NameError: uninitialized constant MultiJSON` | "MultiJSON Removed from Rails" — add `gem 'multi_json'` or move to `to_json` / `JSON.parse` |
 | `NoMethodError: undefined method 'find_all_by_email'` | "Dynamic Finders Removed" — rewrite as `where(email: email)`, or `activerecord-deprecated_finders` temporarily |
-| `ActiveRecord::RecordNotFound: Couldn't find all ... with 'id': (first, {:conditions=>...})` from inside a gem | "Dynamic Finders Removed": upgrade the gem (e.g. `acts_as_list` to 0.3+) |
+| `ActiveRecord::RecordNotFound: Couldn't find all ... with 'id': (first, {:conditions=>...})` from inside a gem, or `ArgumentError: wrong number of arguments` from a gem's `update_all` call | "Dynamic Finders Removed": upgrade the gem (e.g. `acts_as_list` to 0.3+) |
 | Query returns zero rows after upgrade | "`default_scope` Chains with Other Scopes" — use `unscope(where: :col)` or `rewhere` |
 | `ActionController::InvalidAuthenticityToken` in controller tests on JS endpoints | "CSRF Protection Now Covers GET with JS Responses" — use `xhr :verb, :action` |
 | `flash.to_hash.except(:notice)` silently keeps `:notice` | "Flash Message Keys Are Strings" — use `"notice"` |
