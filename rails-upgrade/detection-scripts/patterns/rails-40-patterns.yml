@@ -463,6 +463,17 @@ upgrade_findings:
       fix: "First precompile the 4.0 bundle in a production-like environment to find out whether any flagged file actually fails. If one does, keep 3.2's behavior by giving sass-rails a compressor object so its `||=` leaves it alone: in config/application.rb, `config.assets.css_compressor = Class.new { def compress(css); return css unless css.count(\"\\n\") > 2; Sass::Engine.new(css, syntax: :scss, style: :compressed, cache: false, read_cache: false).render; end }.new`. It works on 3.2 and 4.0 alike, so it needs no NextRails.next? branch. Other options: bump the sass gem (3.7.4 renders `max(var(--gap), 1px)` that 3.4 rejects) or switch to a CSS-only compressor. Do not assign an object whose `compress` returns its input unchanged: precompile goes green, but production CSS stops being minified and nothing reports it. Then compare the size of the precompiled application-*.css with the 3.2 build"
       variable_name: "CSS_COMPRESSOR_MINIFIED_GUARD"
 
+    - name: "FormBuilder.field_helpers compared against strings"
+      kind: "breaking"
+      pattern: "\\bfield_helpers\\b"
+      exclude: "^\\s*#|^[^#]*\\bfield_helpers\\.(?:map|collect)\\(&:to_s(?:ym)?\\)"
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "ActionView::Helpers::FormBuilder.field_helpers changes element type at 4.0. On 3.2 it is built as `FormHelper.instance_method_names - %w(form_for convert_to_model)`, and instance_method_names returns strings, so the list holds \"text_field\", \"label\" and so on. On 4.0 it is a literal array of symbols (`[:fields_for, :label, :text_field, ...]`). Custom form builders that do string work on it silently stop matching: `field_helpers - %w(label fields_for)` removes nothing, `field_helpers.include?(\"text_field\")` is false, `helper == \"label\"` never hits. The usual victim is a builder that decorates every helper except a few, so on 4.0 it also redefines label, hidden_field or fields_for and changes what those fields render. Nothing raises or warns at the bump. The pattern flags every reference to field_helpers in app/ and lib/ so each one can be checked; a line that already normalizes with `.map(&:to_s)` or `.map(&:to_sym)` is excluded"
+      fix: "Normalize the element type before comparing: `field_helpers.map(&:to_s) - %w(label fields_for)` when the other side is strings, or `field_helpers.map(&:to_sym) - [:label, :fields_for]` when it is symbols. Both give the same list on 3.2 and 4.0, so the change ships before the bump without a NextRails.next? branch. Add a spec that builds a form with the custom builder and asserts the helpers meant to be skipped render as plain Rails output"
+      variable_name: "FIELD_HELPERS_SYMBOLS"
+
     - name: "config.paths[\"config/routes\"] (without .rb)"
       kind: "breaking"
       pattern: "config\\.paths\\[.config/routes.\\]"

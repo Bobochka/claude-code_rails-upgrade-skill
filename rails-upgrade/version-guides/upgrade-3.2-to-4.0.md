@@ -906,6 +906,33 @@ with the 3.2 build.
 
 ---
 
+#### `FormBuilder.field_helpers` Holds Symbols, Not Strings
+
+**What Changed:**
+On 3.2, `ActionView::Helpers::FormBuilder.field_helpers` is
+`FormHelper.instance_method_names - %w(form_for convert_to_model)`, a list of strings.
+On 4.0 it is a literal array of symbols. String operations on it silently stop matching:
+`field_helpers - %w(label fields_for)` removes nothing on 4.0. A custom builder that
+decorates every helper except a few ends up redefining the ones it meant to skip, and
+nothing raises or warns.
+
+**Detection Pattern:**
+```ruby
+class LabeledFormBuilder < ActionView::Helpers::FormBuilder
+  (field_helpers - %w(label fields_for hidden_field)).each do |helper|
+```
+
+**Fix:**
+```ruby
+# BEFORE
+(field_helpers - %w(label fields_for hidden_field)).each do |helper|
+
+# AFTER: same list on 3.2 and 4.0
+(field_helpers.map(&:to_s) - %w(label fields_for hidden_field)).each do |helper|
+```
+
+---
+
 #### Bidirectional `dependent: :destroy` Now Recurses Forever
 
 **What Changed:**

@@ -271,6 +271,22 @@ CSS_COMPRESSOR_MINIFIED_GUARD:
     # a short one-line file is not minified vendor CSS
     - ".hidden{display:none}"
 
+FIELD_HELPERS_SYMBOLS:
+  # Pattern: any reference to field_helpers; lines already normalized are skipped.
+  match:
+    - "  (field_helpers - %w(label fields_for hidden_field)).each do |helper|"
+    - "  helpers = field_helpers +"
+    - "    next unless self.class.field_helpers.include?(\"text_field\")"
+    - "  wrapped = field_helpers.reject { |h| h == \"label\" }"
+  no_match:
+    # already normalized to one element type
+    - "  (field_helpers.map(&:to_s) - %w(label fields_for)).each do |helper|"
+    - "  (field_helpers.map(&:to_sym) - [:label, :fields_for]).each do |helper|"
+    # a longer identifier is not the class attribute
+    - "  custom_field_helpers_list = []"
+    # commented-out reference
+    - "  # field_helpers - %w(label)"
+
 CONFIG_ROUTES_PATH:
   match:
     - "  config.paths[\"config/routes\"].concat %w(lib/custom_routes)"
