@@ -73,10 +73,10 @@ rbenv local 2.7.8
 
 ---
 
-#### update_attributes Removed
+#### update_attributes Deprecated
 
 **What Changed:**
-`update_attributes` and `update_attributes!` are removed.
+`update_attributes` and `update_attributes!` become deprecated aliases of `update` and `update!`: they still work on 6.0 and emit a deprecation warning on every call. Rails 6.1 removes them, so every call raises `NoMethodError` after the next hop. Replacing them now is the same edit either way.
 
 **Detection Pattern:**
 ```ruby
