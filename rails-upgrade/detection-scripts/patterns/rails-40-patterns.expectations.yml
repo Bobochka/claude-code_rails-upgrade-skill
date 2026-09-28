@@ -591,8 +591,9 @@ ORDER_WITHOUT_ARGUMENTS:
 
 SQUEEL_ORDER_JOINED_TABLE:
   # Pattern: a hash anywhere in an order / reorder argument list whose value
-  # is not exactly :asc or :desc. The scanner matches file content, so a hash
-  # spread over several lines is reached too; fixtures cover one line.
+  # is not exactly :asc or :desc. The whole-file scanner (scan_patterns.rb)
+  # also reaches a hash spread over several lines; a line-based search does
+  # not. Fixtures test one line at a time.
   match:
     - "          .order(tags: :id)"
     - "          .order({ task_items: :month })"
@@ -611,6 +612,9 @@ SQUEEL_ORDER_JOINED_TABLE:
     - "    Widget.order(name: :asc, events: :start)"
     - "    Widget.order({ name: :asc, events: :start })"
     - "    Widget.order([{ name: :x }])"
+    # a leading argument with one level of parentheses
+    - "    Widget.order(Arel.sql(\"x\"), events: :start)"
+    - "    Widget.order(sort_key(:a), name: \"desc\")"
     # a valid call earlier on the line must not hide the bad one
     - "    Widget.order(id: :desc).order(events: :start)"
   no_match:
@@ -635,6 +639,8 @@ SQUEEL_ORDER_JOINED_TABLE:
     - "    Widget.order(Report::SORT)"
     - "    Widget.order(ready ? \"a\" : \"b\")"
     - "    Widget.order(:name).where(state: :open)"
+    - "    Widget.order(Arel.sql(\"x\"), name: :desc)"
+    - "    Widget.order(coalesce(a, b: :c))"
 
 BELONGS_TO_DEPENDENT:
   match:

@@ -484,9 +484,11 @@ it, and why that method name must end there: without the trailing boundary,
 `line_item.order.summary` matches on `sum`. The hash grep is a rough first pass: its
 `:asc` / `:desc` filter drops the whole line, so a line chaining a bad hash and a good one
 is filtered out with it, and it cannot see a hash spread over several lines. The skill's
-own pattern checks each value and reads across lines, but it cannot see a hash held in a
-constant or built at runtime (`order(SORT)`), so also scan `order(` by hand in query
-objects and reports. Two shapes stay invisible to both
+own pattern checks each value. Run through the whole-file scanner
+(`detection-scripts/scan_patterns.rb`) it also reads a hash spread over several lines; run
+as a line-based search it sees only one-line calls, so check multi-line `order(` calls by
+hand in that case. Neither can see a hash held in a constant or built at runtime
+(`order(SORT)`), so also scan `order(` by hand in query objects and reports. Two shapes stay invisible to both
 the grep and the skill's own pattern: a receiverless `order` inside a scope
 (`scope :recent, -> { order }`), and a bare call followed by an enumerable method rather
 than a relation method (`.order.map { ... }`, `.order.sort_by { ... }`).
