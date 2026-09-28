@@ -373,15 +373,28 @@ upgrade_findings:
       fix: "Add gem 'rails-observers' to Gemfile (includes sweepers)"
       variable_name: "SWEEPERS"
 
-    - name: "Action caching (caches_page/caches_action)"
+    - name: "Action caching (caches_action)"
       kind: "breaking"
-      pattern: "caches_page|caches_action"
-      exclude: ""
+      pattern: "\\b(?:caches_action|expire_action)\\b"
+      exclude: "^\\s*#"
       search_paths:
-        - "app/controllers/"
-      explanation: "Page and action caching were extracted from Rails 4.0 into two separate gems: caches_page moved to actionpack-page_caching, caches_action moved to actionpack-action_caching"
-      fix: "Add gem 'actionpack-page_caching' for caches_page and/or gem 'actionpack-action_caching' for caches_action, matching the methods the app actually uses"
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4.0 deletes actionpack's action_controller/caching/actions.rb and moves action caching into the actionpack-action_caching gem. Without the gem, `caches_action` raises NoMethodError when the controller class loads, and `expire_action` (often called from sweepers or models) raises when it runs. Page caching moved to a different gem; see PAGE_CACHING"
+      fix: "Add `gem \"actionpack-action_caching\"` to the next side of the Gemfile only: the gem has required actionpack >= 4.0 since its first release, so it cannot bundle on 3.2, where the methods still come from Rails. Call sites stay as they are"
       variable_name: "ACTION_CACHING"
+
+    - name: "Page caching (caches_page)"
+      kind: "breaking"
+      pattern: "\\b(?:caches_page|expire_page|page_cache_directory)\\b"
+      exclude: "^\\s*#"
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "config/"
+      explanation: "Rails 4.0 deletes actionpack's action_controller/caching/pages.rb and moves page caching into the actionpack-page_caching gem. Without the gem, `caches_page` raises NoMethodError when the controller class loads, `expire_page` raises when it runs, and a `page_cache_directory` setting has nothing to configure. actionpack-action_caching does not provide any of these; see ACTION_CACHING"
+      fix: "Add `gem \"actionpack-page_caching\"` to the next side of the Gemfile only: the gem has required actionpack >= 4.0 since its first release, so it cannot bundle on 3.2, where the methods still come from Rails. Call sites stay as they are. The gem sets `page_cache_directory` to public/ when the app does not, which matches the 3.2 default"
+      variable_name: "PAGE_CACHING"
 
     - name: "ActiveResource usage"
       kind: "breaking"
@@ -669,13 +682,13 @@ dependencies:
   actionpack_action_caching:
     check: false
     gem_name: "actionpack-action_caching"
-    message: "Required if using caches_action — extracted from Rails core at 4.0"
+    message: "Required if using caches_action or expire_action (ACTION_CACHING), extracted from Rails core at 4.0. Requires actionpack >= 4.0, so add it on the next side only"
     url: "https://github.com/rails/actionpack-action_caching"
 
   actionpack_page_caching:
     check: false
     gem_name: "actionpack-page_caching"
-    message: "Required if using caches_page — extracted from Rails core at 4.0 (separate gem from actionpack-action_caching)"
+    message: "Required if using caches_page, expire_page or page_cache_directory (PAGE_CACHING), extracted from Rails core at 4.0. Separate gem from actionpack-action_caching. Requires actionpack >= 4.0, so add it on the next side only"
     url: "https://github.com/rails/actionpack-page_caching"
 
   activeresource:

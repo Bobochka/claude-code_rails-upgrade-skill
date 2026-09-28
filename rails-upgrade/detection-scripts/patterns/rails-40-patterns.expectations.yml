@@ -187,11 +187,29 @@ SWEEPERS:
     - "class ProductObserver < ActiveRecord::Observer"
 
 ACTION_CACHING:
+  # Pattern: caches_action / expire_action; page caching is PAGE_CACHING.
   match:
     - "  caches_action :index"
-    - "  caches_page :show"
+    - "  caches_action :show, :layout => false, :expires_in => 1.hour"
+    - "    expire_action :controller => 'products', :action => 'index'"
   no_match:
+    - "  caches_page :show"
     - "  fragment_cache_key 'products'"
+    - "    expire_fragment('products/sidebar')"
+    - "  # caches_action :index"
+
+PAGE_CACHING:
+  # Pattern: caches_page / expire_page / page_cache_directory.
+  match:
+    - "  caches_page :show"
+    - "  caches_page :feed, if: Proc.new { |c| !c.request.format.html? }"
+    - "    expire_page :controller => 'products', :action => 'show', :id => product.id"
+    - "  config.action_controller.page_cache_directory = Rails.root.join('public', 'cache').to_s"
+  no_match:
+    - "  caches_action :index"
+    - "  # caches_page :show"
+    # page_cache_extension is still in 4.0 core, as a deprecated alias
+    - "  self.page_cache_extension = '.html'"
 
 ACTIVE_RESOURCE:
   match:

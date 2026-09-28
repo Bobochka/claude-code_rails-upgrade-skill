@@ -751,22 +751,36 @@ Note: This is the same gem as "Observers Extracted" — `rails-observers` bundle
 
 ---
 
-#### Action Caching Extracted
+#### Page and Action Caching Extracted
 
 **What Changed:**
-`caches_page` and `caches_action` are no longer included.
+Rails 4.0 removes page caching and action caching from Action Pack and ships them as two
+separate gems. `caches_page`, `expire_page` and `page_cache_directory` move to
+`actionpack-page_caching`; `caches_action` and `expire_action` move to
+`actionpack-action_caching`. Without the matching gem, `caches_page` or `caches_action`
+raises `NoMethodError` when the controller class loads.
 
 **Detection Pattern:**
 ```ruby
 caches_page :public
+expire_page action: "public"
 caches_action :index, :show
+expire_action action: "index"
 ```
 
 **Fix:**
 ```ruby
-# Gemfile
-gem 'actionpack-action_caching'
+# BEFORE: Gemfile, nothing needed on 3.2
+
+# AFTER: add only the gem for the methods the app calls, on the next side,
+# since both gems require actionpack >= 4.0 and cannot bundle on 3.2
+if next?
+  gem "actionpack-page_caching"    # caches_page, expire_page
+  gem "actionpack-action_caching"  # caches_action, expire_action
+end
 ```
+
+Call sites stay as they are.
 
 ---
 
@@ -1321,6 +1335,8 @@ gem 'rails', '~> 4.0.0'
 
 # Add if needed
 gem 'rails-observers'       # If using observers or sweepers
+gem 'actionpack-page_caching'   # If using caches_page
+gem 'actionpack-action_caching' # If using caches_action
 ```
 
 ```bash
@@ -1394,6 +1410,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `ArgumentError: Direction should be :asc or :desc` | "`order` and `reorder` Require Arguments" — hash values must be `:asc` / `:desc`; use strings across joins |
 | `NoMethodError: undefined method 'rescue_action'` | "`rescue_action` Removed — Use `rescue_from`" |
 | `NoMethodError: undefined method 'install_helpers'` | "`RouteSet#install_helpers` Removed": include `url_helpers` instead |
+| `NoMethodError: undefined method 'caches_page'` or `'caches_action'` | "Page and Action Caching Extracted": add the matching gem on the next side |
 | `undefined local variable or method` in partial | "Partial Magic Variables Removed" — pass `locals:` |
 | Cache misses after upgrade | "`cache_key` Timestamp Format Changed" — changed to `:nsec` |
 | `invalid date` in fixtures | "Fixture Dates Must Be Cast to Strings" — cast with `.to_s(:db)` |
