@@ -791,8 +791,8 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 13. Remove MultiJSON usage or add it back to the `Gemfile` explicitly.
 14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
 15. Move `update_all(updates, conditions)` conditions into a `where` chain.
-15. Move finder options on `count` / `sum` / `maximum` / ... (`conditions:`, `joins:`, `group:`) onto chained scopes.
-15. Replace `count(:col, distinct: true)` with `distinct.count(:col)`.
+16. Move finder options on `count` / `sum` / `maximum` / ... (`conditions:`, `joins:`, `group:`) onto chained scopes.
+17. Replace `count(:col, distinct: true)` with `distinct.count(:col)`.
 
 ### Phase 6: Testing
 - Run full test suite.
