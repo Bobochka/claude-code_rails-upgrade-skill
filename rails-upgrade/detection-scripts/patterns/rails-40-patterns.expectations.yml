@@ -616,9 +616,16 @@ REMOTE_FORM_CSRF_TOKEN:
     # options hash built on an earlier line, then passed to a form helper
     - '    html_options[:"data-remote"] = true'
     - '    form_options[:remote] = true'
+    # HAML id shorthand is not a comment
+    - '#search= form_tag search_path, remote: true do'
+    # a remote: true outside the data hash still drops the token
+    - '= form_for @note, remote: true, html: { data: { remote: true } } do |f|'
+    - '= form_for @note, html: { data: { confirm: "Sure?" } }, remote: true do |f|'
   no_match:
-    # data: { remote: true } keeps the hidden token on 4.0
+    # data: { remote: true } keeps the hidden token on 4.0, whatever else the hash holds
     - '= form_for @note, html: { data: { remote: true } } do |f|'
+    - '= form_for @note, html: { data: { remote: true, type: :json } } do |f|'
+    - '= form_tag notes_path, :data => { :type => :json, :remote => true } do'
     # link options hash literal, not an assignment
     - "    { \"data-remote\": \"true\", \"data-type\": \"html\" }"
     # a hand-written form tag gets no token from Rails on either version
