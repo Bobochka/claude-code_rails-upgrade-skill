@@ -258,7 +258,7 @@ dependencies:
   multi_json:
     check: false
     gem_name: "multi_json"
-    message: "Add to Gemfile only if the app still calls MultiJSON.dump / MultiJSON.load directly — Rails 4.1 no longer pulls it in"
+    message: "Add to Gemfile only if the app still calls MultiJson.dump / MultiJson.load directly — Rails 4.1 no longer pulls it in"
     url: "https://github.com/intridea/multi_json"
 
   activerecord-deprecated_finders:
