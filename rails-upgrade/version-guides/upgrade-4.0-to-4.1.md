@@ -248,6 +248,44 @@ As a short-term bridge, `gem 'activerecord-deprecated_finders'` restores `:condi
 
 ---
 
+#### Association `:order` Option Removed
+
+**What Changed:**
+Rails 4.1 no longer depends on `activerecord-deprecated_finders`, the gem that kept `:order` working (with a deprecation warning) on 4.0. Without it, `has_many` and `belongs_to` reject the key when the model class loads:
+
+```
+ArgumentError: Unknown key: :order. Valid keys are: :class_name, :anonymous_class, :foreign_key, ...
+```
+
+The app fails to boot or eager load, and every test that touches the model fails. Two shapes fail silently instead:
+
+- **`has_one`.** 4.1 still lists `:order` as a valid `has_one` key but no longer applies it. There is no error, and the association returns whichever row the database hands back first, so "latest" or "primary" lookups change.
+- **`has_and_belongs_to_many`.** 4.1 rebuilds it as a `has_many :through` and passes on only a fixed list of options (`:before_add`, `:after_add`, `:before_remove`, `:after_remove`, `:autosave`, `:validate`, `:join_table`). `:order` is dropped with no error and no warning. The bridge gem does not change this.
+
+**Detection Pattern:**
+```ruby
+has_many :items, :order => "position ASC"
+has_one :latest_comment, class_name: "Comment", order: "created_at DESC"
+has_and_belongs_to_many :tags, order: :name
+```
+
+**Fix:**
+```ruby
+# BEFORE
+has_many :items, :order => "position ASC"
+has_one :latest_comment, class_name: "Comment", order: "created_at DESC"
+has_and_belongs_to_many :tags, order: :name
+
+# AFTER
+has_many :items, -> { order("position ASC") }
+has_one :latest_comment, -> { order("created_at DESC") }, class_name: "Comment"
+has_and_belongs_to_many :tags, -> { order(:name) }
+```
+
+The lambda form works on 4.0 and 4.1, so the rewrite can land before the version bump. As a short-term bridge, `gem 'activerecord-deprecated_finders'` restores `:order` on `has_many` / `has_one` / `belongs_to`. It does not fix `has_and_belongs_to_many`.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### MultiJSON Removed from Rails
@@ -714,6 +752,7 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 13. Remove MultiJSON usage or add it back to the `Gemfile` explicitly.
 14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
 15. Move association `:conditions` into scope lambdas, including every `has_and_belongs_to_many` (4.1 drops the option there without an error).
+15. Move association `:order` into scope lambdas, including every `has_one` and `has_and_belongs_to_many` (4.1 ignores the option there without an error).
 
 ### Phase 6: Testing
 - Run full test suite.
@@ -742,6 +781,8 @@ Error → section lookup for the most common errors encountered during this upgr
 | API clients fail to parse `2024-01-01T00:00:00.000Z` | "`as_json` Millisecond Precision for Time/DateTime/TWZ" — `ActiveSupport::JSON::Encoding.time_precision = 0` or update consumers |
 | `ArgumentError: Unknown key: :conditions` when a model loads | "Association `:conditions` Option Removed": move the conditions into a scope lambda |
 | `has_and_belongs_to_many` returns rows its `:conditions` used to filter out | "Association `:conditions` Option Removed": habtm drops the option silently at 4.1, use a scope lambda |
+| `ArgumentError: Unknown key: :order` when a model loads | "Association `:order` Option Removed": move the order into a scope lambda |
+| `has_one` or `has_and_belongs_to_many` returns rows in a different order | "Association `:order` Option Removed": 4.1 ignores `:order` there without an error, use a scope lambda |
 
 ---
 

@@ -92,6 +92,16 @@ upgrade_findings:
       fix: "Move the conditions into a scope lambda: has_many :active_items, -> { where(active: true) }, class_name: 'Item'. The lambda form works on 4.0 and 4.1, so it can land before the bump, and it is the only form that filters a has_and_belongs_to_many on 4.1. A proc :conditions ran against the owner; the lambda runs against the relation and receives the owner as its argument, so has_many :items, conditions: proc { ['account_id = ?', account_id] } becomes has_many :items, ->(owner) { where(account_id: owner.account_id) }. As a short-term bridge, gem 'activerecord-deprecated_finders' restores :conditions on has_many / has_one / belongs_to; it does not fix habtm or a Hash value on Ruby 2.3+"
       variable_name: "ASSOCIATION_CONDITIONS"
 
+    - name: "Association :order option"
+      kind: breaking
+      pattern: "(has_many|has_one|belongs_to|has_and_belongs_to_many).*[^_]:?order(:|\\s*=>)"
+      exclude: ""
+      search_paths:
+        - "app/models/"
+      explanation: "Rails 4.1 no longer depends on activerecord-deprecated_finders, the gem that kept :order working (with a deprecation warning) on 4.0. Without it, has_many and belongs_to raise `ArgumentError: Unknown key: :order` when the model class loads, so boot, eager loading and every test that touches the model fail. Two shapes fail silently instead. has_one still lists :order as a valid key but no longer applies it, so it returns whichever row the database hands back first. has_and_belongs_to_many drops :order, because 4.1 rebuilds it as has_many :through and passes on only a fixed list of options; the gem does not change this. Neither raises nor warns. The pattern only sees options on the same line as the macro"
+      fix: "Move the order into a scope lambda: has_many :items, -> { order('position ASC') }; has_one :latest_comment, -> { order('created_at DESC') }, class_name: 'Comment'. The lambda form works on 4.0 and 4.1, so it can land before the bump, and it is the only form that orders a has_one or a has_and_belongs_to_many on 4.1. As a short-term bridge, gem 'activerecord-deprecated_finders' restores :order on has_many / has_one / belongs_to; it does not help habtm"
+      variable_name: "ASSOCIATION_ORDER"
+
   medium_priority:
     - name: "MultiJSON usage"
       kind: breaking

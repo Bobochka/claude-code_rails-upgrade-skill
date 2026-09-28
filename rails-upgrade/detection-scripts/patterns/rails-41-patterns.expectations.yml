@@ -38,3 +38,17 @@ ASSOCIATION_CONDITIONS:
     - "  has_many :items, before_add: :check_conditions"
     # not an association: the validator's own :conditions option is still valid at 4.1
     - "  validates_uniqueness_of :email, conditions: -> { where(deleted_at: nil) }"
+
+ASSOCIATION_ORDER:
+  match:
+    - "  has_many :items, :order => 'position ASC'"
+    - "  has_one :latest_comment, class_name: \"Comment\", order: \"created_at DESC\""
+    - "  has_and_belongs_to_many :tags, order: :name"
+  no_match:
+    - "  has_many :items, -> { order('position ASC') }"
+    - "  has_one :latest_comment, -> { order(created_at: :desc) }, class_name: \"Comment\""
+    # underscore before "order" (sort_order) must not trip the [^_] guard
+    - "  has_many :items, sort_order: 'asc'"
+    # an association named order is not the option
+    - "  belongs_to :order, touch: true"
+    - "  has_many :orders, dependent: :destroy"
