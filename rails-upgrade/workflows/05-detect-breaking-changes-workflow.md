@@ -91,7 +91,7 @@ From the app root, run the scanner with the app's Ruby (it is stdlib only and ru
 ruby <skill>/detection-scripts/scan_patterns.rb > tmp/pattern-scan.md
 ```
 
-`<skill>` is this skill's directory, the one holding `SKILL.md`. With no arguments the script reads the current Rails version from `Gemfile.lock` and scans with the next patterns file (4.0 -> 4.1, 6.0 -> 7.0). Pass `--target X.Y` when the hop is different, for example when `Gemfile.lock` is still on the previous version during a dual-boot or when planning a later hop of a multi-hop plan.
+`<skill>` is this skill's directory, the one holding `SKILL.md`. With no arguments the script reads the current Rails version from `Gemfile.lock` and scans the next hop listed in `version-guides/` (4.0 -> 4.1). `Gemfile.lock` stays on the current version while `Gemfile.next.lock` carries the target, so the default is right for the usual flow. Pass `--target X.Y` when `Gemfile.lock` already pins the target version, or to scan a later hop of a multi-hop plan. When the next hop has no patterns file (6.0 -> 6.1), the script stops and says so rather than scanning the following hop's patterns.
 
 The output is markdown:
 
@@ -101,9 +101,9 @@ The output is markdown:
 - **Suppressed by exclude**: sites the pattern matched that `exclude:` dropped;
 - **UNSCANNED**: patterns whose search_paths resolved to no files in this app.
 
-Useful flags: `--summary` prints only the summary and the status lists (for a first look at a large app), `--format json` prints one object per pattern with its bucket, status (`found` / `clean` / `unscanned`) and sites, `--show-suppressed` lists every suppressed site.
+Useful flags: `--summary` prints only the summary and the status lists (for a first look at a large app), `--format json` prints one object per pattern with its bucket, status (`found` / `clean` / `suppressed` / `unscanned`) and sites, `--show-suppressed` lists every suppressed site.
 
-The scanner matches against file content, so a call split across lines is found when the pattern is written to cross newlines. It also searches Packwerk packs, engines and components (`app/models/` also reaches `packs/*/app/models/`) and skips `node_modules`, `vendor`, `tmp` and `log` unless a search_path names them.
+The scanner matches against file content, so a call split across lines is found when the pattern is written to cross newlines. It also searches Packwerk packs, engines and components (`app/models/` also reaches `packs/*/app/models/`) and skips `node_modules` anywhere and `vendor`, `tmp` and `log` at the app or pack root, unless a search_path names them. A site that spans lines is reported as `file:start-end`.
 
 If Ruby cannot run in the app's environment at all, fall back to the Grep tool: for every pattern in `upgrade_findings.high_priority`, `medium_priority` and `low_priority`, run one Grep per search_path with `output_mode: "content"` and `-n: true`, then drop lines that match `exclude:`. Grep is line-based, so its counts are a floor for patterns that span lines.
 

@@ -16,10 +16,11 @@
 #   ruby <skill>/detection-scripts/scan_patterns.rb --self-test
 #
 # Without --target or --patterns, the current Rails version is read from the
-# app's Gemfile.lock and the target is the next version that has a patterns
-# file (4.0 -> 4.1, 6.0 -> 7.0 while there is no 6.1 file, and so on).
+# app's Gemfile.lock and the target is the next hop in version-guides/
+# (4.0 -> 4.1). When that hop has no patterns file (6.0 -> 6.1) the script
+# stops instead of scanning the following hop's patterns under the wrong label.
 #
-# Runs with the app's own Ruby, so it stays Ruby 2.3 compatible: stdlib only,
+# Runs with the app's own Ruby, so it stays Ruby 2.1 compatible: stdlib only,
 # no `&.`, no `<<~`, no `String#match?`, no `Array#sum`, no `Dir.children`.
 #
 # How matching works, and why:
@@ -30,7 +31,9 @@
 #    grep can never see those sites, so its counts are a floor.
 # 2. One row per SITE, keyed on where the match ends. The end is the offending
 #    token and is the line reported. Two matches ending at the same offset are
-#    one site; two sites sharing a line are two rows.
+#    one site; two sites sharing a line are two rows. A site that spans lines
+#    is reported as file:start-end and quotes both ends, since the offending
+#    token can sit on either one.
 # 3. `exclude:` is tested on the lines the match spans. A site is suppressed
 #    only when every match reaching it was excluded. Suppressed sites are
 #    counted and listed with --show-suppressed, because `exclude:` can drop a
@@ -38,10 +41,14 @@
 # 4. A match may not span more than MAX_SPAN_LINES, so a loose pattern cannot
 #    rope two unrelated calls together.
 # 5. An entry whose search_paths resolve to no files is UNSCANNED, never zero
-#    hits. "Could not scan" and "scanned clean" are different answers.
+#    hits, and an entry whose every site was dropped by exclude: is
+#    "suppressed", never clean. "Could not scan" and "scanned clean" are
+#    different answers.
 # 6. Packwerk packs, engines and components are searched too: a search_path
 #    like "app/models/" also reaches packs/*/app/models/. node_modules, vendor,
-#    tmp, log, coverage are skipped unless a search_path names them.
+#    tmp, log, coverage are skipped at the app root and at each pack or engine
+#    root (app/models/log/ is app code), node_modules, .git and .bundle at any
+#    depth, unless a search_path names them.
 # 7. An entry with an empty `pattern:` is path-based: it fires when any file
 #    exists under its search_paths (e.g. vendor/plugins/).
 
@@ -63,7 +70,12 @@ MAX_SITES_PER_LINE = 4
 MAX_TEXT = 100
 
 IGNORED_DIRS = %w[node_modules vendor tmp log coverage .git .bundle].freeze
-IGNORED_PATH_RE = Regexp.new("(?:\\A|/)(?:" + IGNORED_DIRS.map { |d| Regexp.escape(d) }.join("|") + ")/")
+# Skipped at any depth: never app code wherever they sit (a pack keeps its
+# webpack build at app/webpack/node_modules/).
+IGNORED_ANYWHERE = %w[node_modules .git .bundle].freeze
+# Skipped only at the app root or a pack/engine root: app/models/log/ and
+# app/controllers/vendor/ are app code.
+IGNORED_AT_ROOT = %w[vendor tmp log coverage].freeze
 MODULAR_ROOT_SEEDS = %w[packs engines components].freeze
 MODULAR_ROOT_MARKERS = ["package.yml", "*.gemspec", "lib/*/engine.rb"].freeze
 MAX_MODULAR_ROOT_DEPTH = 2
@@ -153,27 +165,33 @@ class Scanner
     end
   end
 
-  def ignored?(path)
-    !(path =~ IGNORED_PATH_RE).nil?
+  # `rel` is a file path relative to the root its search_path was joined to
+  # (the app root, or a pack or engine root).
+  def ignored?(rel)
+    dirs = rel.split("/")[0..-2]
+    return false if dirs.empty?
+    IGNORED_AT_ROOT.include?(dirs.first) || dirs.any? { |d| IGNORED_ANYWHERE.include?(d) }
   end
 
-  def resolve(path)
+  def resolve(base, sp)
+    path = File.join(base, sp)
     files = File.exist?(path) ? expand(path) : Dir.glob(path.chomp("/")).sort.flat_map { |m| expand(m) }
     # A search_path that names an ignored dir (vendor/plugins/) gets it.
-    return files if ignored?(path.sub(/\A#{Regexp.escape(File.join(root, ""))}/, ""))
-    files.reject { |f| ignored?(f.sub(/\A#{Regexp.escape(File.join(root, ""))}/, "")) }
+    return files if ignored?(File.join(sp, "x"))
+    prefix = File.join(base, "")
+    files.reject { |f| ignored?(f.start_with?(prefix) ? f[prefix.length..-1] : f) }
   end
 
   def candidate_files(sp)
     @candidates[sp] ||= begin
-      locations = [File.join(root, sp)]
+      bases = [root]
       unless ENVIRONMENT_MANIFESTS.include?(sp)
         modular_members.each do |m, dirs|
           next if sp == m || sp.start_with?("#{m}/")
-          locations.concat(dirs.map { |d| File.join(d, sp) })
+          bases.concat(dirs)
         end
       end
-      locations.flat_map { |loc| resolve(loc) }.uniq
+      bases.flat_map { |base| resolve(base, sp) }.uniq
     end
   end
 
@@ -199,8 +217,8 @@ class Scanner
       # Scrub rather than skip: skipping a file with one bad byte reports it
       # as scanned clean.
       content = content.scrub("?") unless content.valid_encoding?
-      scan_content(content, pattern, exclude).each do |line, text, excluded|
-        (excluded ? suppressed : hits) << [relative(file), line, text]
+      scan_content(content, pattern, exclude).each do |line, text, excluded, start|
+        (excluded ? suppressed : hits) << [relative(file), line, text, start]
       end
     end
     { :files_scanned => files.length, :hits => hits, :suppressed => suppressed }
@@ -235,15 +253,28 @@ class Scanner
         span = content[bol(content, b)...eol(content, tail)].to_s
         excluded = !(span =~ exclude).nil?
       end
-      pos = if excluded && end_line > line_no
+      # An over-long match retries one character later, so a real site inside
+      # the span it would have swallowed is still found.
+      pos = if !span_ok
+              b + 1
+            elsif excluded && end_line > line_no
               eol(content, b) + 1
             else
               e > b ? e : b + 1
             end
       next unless span_ok
 
-      site = sites[e] ||= { :line => end_line + 1, :excluded => true,
-                            :text => content[bol(content, tail)...eol(content, tail)].to_s.strip[0, MAX_TEXT] }
+      # A multi-line site reports its whole span and quotes both ends: the
+      # offending token can sit on either one (`link_to ... confirm:` ends on
+      # it, `update_all(` followed by the conditions starts on it).
+      end_text = content[bol(content, tail)...eol(content, tail)].to_s.strip
+      site = sites[e] ||= if end_line > line_no
+                            start_text = content[bol(content, b)...eol(content, b)].to_s.strip
+                            { :line => end_line + 1, :start => line_no + 1, :excluded => true,
+                              :text => "#{start_text[0, MAX_TEXT / 2]} ... #{end_text[0, MAX_TEXT / 2]}" }
+                          else
+                            { :line => end_line + 1, :excluded => true, :text => end_text[0, MAX_TEXT] }
+                          end
       site[:excluded] &&= excluded
     end
 
@@ -255,7 +286,7 @@ class Scanner
       if group.length > MAX_SITES_PER_LINE
         rows << [ln, "#{group.first[:text][0, 60]} (#{group.length} matches on this line)", group.all? { |g| g[:excluded] }]
       else
-        group.each { |s| rows << [ln, s[:text], s[:excluded]] }
+        group.each { |s| rows << [ln, s[:text], s[:excluded], s[:start]] }
       end
     end
     rows
@@ -291,6 +322,16 @@ def available_versions
   end.compact.sort_by { |v| version_key(v) }
 end
 
+GUIDES_DIR = File.expand_path("../version-guides", __dir__)
+
+# The hop after `current` according to the version guides (6.0 -> 6.1), or
+# nil when no guide starts at `current`. The guides, not the patterns files,
+# define the hops: 6.1 has a guide and no patterns file.
+def guide_hop(current)
+  g = Dir[File.join(GUIDES_DIR, "upgrade-#{current}-to-*.md")].first
+  g ? File.basename(g)[/-to-(\d+\.\d+)\.md\z/, 1] : nil
+end
+
 def patterns_file_for(version)
   File.join(PATTERNS_DIR, "rails-#{version.delete('.')}-patterns.yml")
 end
@@ -314,8 +355,9 @@ def md_cell(s)
   s.to_s.gsub("|", "\\|").gsub("`", "'")
 end
 
-def site_ref(file, line)
-  line ? "#{file}:#{line}" : file
+def site_ref(file, line, start = nil)
+  return file unless line
+  start && start != line ? "#{file}:#{start}-#{line}" : "#{file}:#{line}"
 end
 
 def render_markdown(meta, results, opts)
@@ -346,10 +388,12 @@ def render_markdown(meta, results, opts)
   total_sites = found.inject(0) { |t, r| t + r[:hits].length }
   affected = found.flat_map { |r| r[:hits].map(&:first) }.uniq.length
   out << "#{found.length} of #{results.length} patterns matched: #{total_sites} site(s) in #{affected} file(s). By kind: #{counts}."
-  zero = results.select { |r| r[:hits].empty? && r[:files_scanned] > 0 }
+  zero = results.select { |r| r[:hits].empty? && r[:suppressed].empty? && r[:files_scanned] > 0 }
+  all_suppressed = results.select { |r| r[:hits].empty? && !r[:suppressed].empty? }
   unscanned = results.select { |r| r[:files_scanned].zero? && r[:hits].empty? }
   suppressed = results.reject { |r| r[:suppressed].empty? }
-  out << "#{zero.length} scanned clean, #{unscanned.length} UNSCANNED, #{suppressed.length} with sites suppressed by `exclude:`."
+  out << "#{zero.length} scanned clean, #{unscanned.length} UNSCANNED, #{suppressed.length} with sites suppressed by `exclude:` " \
+         "(#{all_suppressed.length} with every site suppressed, which is not the same as clean)."
 
   unless opts[:summary]
     [["Fix before bump", true], ["Fix when ready", false]].each do |label, before|
@@ -365,7 +409,7 @@ def render_markdown(meta, results, opts)
         out << ""
         out << "| Location | Code |"
         out << "|----------|------|"
-        r[:hits].each { |f, l, t| out << "| #{md_cell(site_ref(f, l))} | `#{md_cell(t)}` |" }
+        r[:hits].each { |f, l, t, st| out << "| #{md_cell(site_ref(f, l, st))} | `#{md_cell(t)}` |" }
       end
     end
   end
@@ -385,9 +429,10 @@ def render_markdown(meta, results, opts)
            "Check the ones where the excluded form can sit on the same line as a real hit#{opts[:show_suppressed] ? '' : ' (re-run with --show-suppressed to list them)'}."
     out << ""
     suppressed.each do |r|
-      out << "- `#{r[:variable]}`: #{r[:suppressed].length} site(s), exclude `#{md_cell(r[:exclude])}`"
+      note = r[:hits].empty? ? " (every site suppressed: check that the exclude does not also drop real hits)" : ""
+      out << "- `#{r[:variable]}`: #{r[:suppressed].length} site(s), exclude `#{md_cell(r[:exclude])}`#{note}"
       next unless opts[:show_suppressed]
-      r[:suppressed].each { |f, l, t| out << "  - #{site_ref(f, l)} `#{md_cell(t)}`" }
+      r[:suppressed].each { |f, l, t, st| out << "  - #{site_ref(f, l, st)} `#{md_cell(t)}`" }
     end
   end
 
@@ -414,11 +459,12 @@ def render_json(meta, results)
         "priority" => r[:priority], "bucket" => r[:bucket], "fix" => r[:fix],
         "files_scanned" => r[:files_scanned],
         "status" => if !r[:hits].empty? then "found"
+                    elsif !r[:suppressed].empty? then "suppressed"
                     elsif r[:files_scanned].zero? then "unscanned"
                     else "clean"
                     end,
-        "sites" => r[:hits].map { |f, l, t| { "file" => f, "line" => l, "text" => t } },
-        "suppressed" => r[:suppressed].map { |f, l, t| { "file" => f, "line" => l, "text" => t } }
+        "sites" => r[:hits].map { |f, l, t, st| { "file" => f, "line" => l, "start_line" => st || l, "text" => t } },
+        "suppressed" => r[:suppressed].map { |f, l, t, st| { "file" => f, "line" => l, "start_line" => st || l, "text" => t } }
       }
     end
   ) + "\n"
@@ -473,6 +519,10 @@ def self_test
     w.call("packs/p1/app/models/b.rb", "scope :old, where(y: 2)\n")
     w.call("packs/p1/app/webpack/node_modules/x/c.rb", "scope :vendored, where(z: 3)\n")
     w.call("vendor/plugins/foo/init.rb", "# plugin\n")
+    w.call("app/controllers/vendor/orders_controller.rb", "x.update_attributes(y)\n")
+    w.call("app/models/log/entry.rb", "x.update_attributes(y)\n")
+    w.call("vendor/bundle/gems/g/lib/g.rb", "x.update_attributes(y)\n")
+    w.call("app/long.rb", "a.count(\n" + ("x\n" * 70) + "y.count(conditions: 1)\n")
     w.call("Gemfile.lock", "GEM\n  specs:\n    rails (4.0.13)\n")
     File.binwrite(File.join(dir, "app/badbyte.rb"), "rel.count(conditions: a)\n\xff\xfe\nrel.count(conditions: b)\n")
 
@@ -483,11 +533,20 @@ def self_test
     check.call("scans non-.rb files", r[:hits].length == 1)
     r = s.scan("pattern" => "\\.count\\([^)]*conditions:", "exclude" => "", "search_paths" => ["app/multi.rb"])
     check.call("finds single-line and multi-line sites (got #{r[:hits].length})", r[:hits].length == 2)
-    check.call("multi-line site reports the end line", r[:hits][1] && r[:hits][1][1] == 3 && r[:hits][1][2] == "conditions: c,")
+    check.call("multi-line site reports its span and quotes both ends (got #{r[:hits][1].inspect})",
+               r[:hits][1] && r[:hits][1][1] == 3 && r[:hits][1][3] == 2 && r[:hits][1][2] == "rel.count( ... conditions: c,")
     r = s.scan("pattern" => "match\\s+\"", "exclude" => "", "search_paths" => ["app/twice.rb"])
     check.call("two sites on one line are two rows", r[:hits].length == 2)
     r = s.scan("pattern" => "match\\s+\"", "exclude" => "via:", "search_paths" => ["app/routes_like.rb"])
     check.call("exclude suppresses and counts", r[:hits].length == 1 && r[:suppressed].length == 1)
+    r = s.scan("pattern" => "update_attributes", "exclude" => "", "search_paths" => ["app/", "lib/"])
+    check.call("vendor/ and log/ below the root are app code (got #{r[:hits].map(&:first).inspect})",
+               r[:hits].map(&:first).sort == ["app/controllers/vendor/orders_controller.rb", "app/models/log/entry.rb"])
+    r = s.scan("pattern" => "update_attributes", "exclude" => "", "search_paths" => ["vendor/"])
+    check.call("a search_path naming vendor/ still scans it", r[:hits].length == 1)
+    r = s.scan("pattern" => "\\.count\\([^)]*conditions:", "exclude" => "", "search_paths" => ["app/long.rb"])
+    check.call("an over-long match does not hide the site inside it (got #{r[:hits].inspect})",
+               r[:hits].length == 1 && r[:hits][0][1] == 72)
     r = s.scan("pattern" => "anything", "exclude" => "", "search_paths" => ["engines/"])
     check.call("missing path is unscanned", r[:files_scanned].zero? && r[:hits].empty?)
     r = s.scan("pattern" => "", "exclude" => "", "search_paths" => ["vendor/plugins/"])
@@ -496,6 +555,7 @@ def self_test
     check.call("invalid byte keeps the file's hits", r[:hits].length == 2)
     check.call("reads the hop from Gemfile.lock", lock_rails_version(File.join(dir, "Gemfile.lock")) == "4.0")
   end
+  check.call("the 6.0 hop is 6.1 per the guides, not the next patterns file", guide_hop("6.0") == "6.1")
   check.call("normalizes 41 and 4.1.2", normalize_target("41") == "4.1" && normalize_target("4.1.2") == "4.1")
 
   # Every shipped patterns file must load and scan without raising.
@@ -550,9 +610,13 @@ if $PROGRAM_NAME == __FILE__
       hop_source = "--target"
     else
       abort("scan_patterns: no Gemfile.lock with rails in #{root}; pass --target X.Y") unless current
-      target = available_versions.find { |v| (version_key(v) <=> version_key(current)) > 0 }
+      target = guide_hop(current) || available_versions.find { |v| (version_key(v) <=> version_key(current)) > 0 }
       abort("scan_patterns: no patterns file newer than Rails #{current}") unless target
-      hop_source = "Gemfile.lock pins rails #{current}; next patterns file is #{target}"
+      unless File.file?(patterns_file_for(target))
+        abort("scan_patterns: the next hop is Rails #{current} -> #{target}, which has no patterns file. " \
+              "Detect it from the version guide by hand, or pass --target X.Y to scan another hop on purpose.")
+      end
+      hop_source = "Gemfile.lock pins rails #{current}; next hop is #{target}"
     end
     patterns = patterns_file_for(target)
     unless File.file?(patterns)
