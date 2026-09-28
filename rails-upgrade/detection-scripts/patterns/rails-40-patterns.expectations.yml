@@ -149,8 +149,18 @@ FIND_OR_CREATE_BY:
 FIND_OR_INITIALIZE_BY:
   match:
     - "User.find_or_initialize_by_email(email)"
+    - "    code = Color.find_or_initialize_by_name_and_shade(\"red\", \"dark\")"
+    # receiverless call inside a class method
+    - "    find_or_initialize_by_slug(slug)"
   no_match:
     - "User.find_or_initialize_by(email: email)"
+    - "User.where(email: email).first_or_initialize"
+    # app-defined methods, not the Rails matcher
+    - "  def find_or_initialize_by_author_id(author_id)"
+    - "    def self.find_or_initialize_by_slot(slot, options = {})"
+    # stub symbol and spec label
+    - "      expect(memberships).to receive(:find_or_initialize_by_author_id).with(42)"
+    - "  describe \"#find_or_initialize_by_author_id\" do"
 
 FIND_LAST_BY:
   match:
