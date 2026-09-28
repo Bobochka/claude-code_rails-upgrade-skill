@@ -774,8 +774,8 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 13. Remove MultiJSON usage or add it back to the `Gemfile` explicitly.
 14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
 15. Move `:confirm` on `link_to` / `button_to` / `submit_tag` / `f.submit` under `data: { confirm: ... }`.
-15. Switch `include AbstractController::Layouts` to `ActionView::Layouts` (branch on `NextRails.next?` while both versions boot).
-15. Upgrade `acts_as_list` below 0.3.0 (check the lockfile) to `~> 0.7.7`.
+16. Switch `include AbstractController::Layouts` to `ActionView::Layouts` (branch on `NextRails.next?` while both versions boot).
+17. Upgrade `acts_as_list` below 0.3.0 (check the lockfile) to `~> 0.7.7`.
 
 ### Phase 6: Testing
 - Run full test suite.
@@ -795,7 +795,7 @@ Error → section lookup for the most common errors encountered during this upgr
 |-------|-----|
 | `NameError: uninitialized constant MultiJSON` | "MultiJSON Removed from Rails" — add `gem 'multi_json'` or move to `to_json` / `JSON.parse` |
 | `NoMethodError: undefined method 'find_all_by_email'` | "Dynamic Finders Removed" — rewrite as `where(email: email)`, or `activerecord-deprecated_finders` temporarily |
-| `ActiveRecord::RecordNotFound: Couldn't find all ... with 'id': (first, {:conditions=>...})` from inside a gem | "Dynamic Finders Removed"; upgrade the gem (e.g. `acts_as_list` to 0.3+) |
+| `ActiveRecord::RecordNotFound: Couldn't find all ... with 'id': (first, {:conditions=>...})` from inside a gem | "Dynamic Finders Removed": upgrade the gem (e.g. `acts_as_list` to 0.3+) |
 | Query returns zero rows after upgrade | "`default_scope` Chains with Other Scopes" — use `unscope(where: :col)` or `rewhere` |
 | `ActionController::InvalidAuthenticityToken` in controller tests on JS endpoints | "CSRF Protection Now Covers GET with JS Responses" — use `xhr :verb, :action` |
 | `flash.to_hash.except(:notice)` silently keeps `:notice` | "Flash Message Keys Are Strings" — use `"notice"` |
@@ -803,8 +803,8 @@ Error → section lookup for the most common errors encountered during this upgr
 | `I18n::InvalidLocale` on a request that worked on 4.0 | "I18n Enforces Available Locales" — add the locale to `config.i18n.available_locales` |
 | `TypeError: CacheDigests is not a class` from every `rake` task | "`cache_digests` Gem Collides with Core Cache Digests" — `gem 'cache_digests' unless NextRails.next?`, move `CacheDigests::*` calls to `ActionView::Digestor` |
 | API clients fail to parse `2024-01-01T00:00:00.000Z` | "`as_json` Millisecond Precision for Time/DateTime/TWZ" — `ActiveSupport::JSON::Encoding.time_precision = 0` or update consumers |
-| Delete link or submit button no longer asks for confirmation; the HTML has `confirm="..."` instead of `data-confirm` | "`:confirm` Option on Link and Button Helpers Removed"; move it to `data: { confirm: ... }` |
-| `NameError: uninitialized constant AbstractController::Layouts` | "`AbstractController::Layouts` Moved to `ActionView::Layouts`"; include `ActionView::Layouts` instead |
+| Delete link or submit button no longer asks for confirmation; the HTML has `confirm="..."` instead of `data-confirm` | "`:confirm` Option on Link and Button Helpers Removed": move it to `data: { confirm: ... }` |
+| `NameError: uninitialized constant AbstractController::Layouts` | "`AbstractController::Layouts` Moved to `ActionView::Layouts`": include `ActionView::Layouts` instead |
 
 ---
 
