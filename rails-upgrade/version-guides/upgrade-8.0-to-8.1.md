@@ -18,7 +18,7 @@ Rails 8.1 is a minor release with:
 
 ### 🔴 HIGH PRIORITY
 
-#### 1. SSL Configuration Commented Out
+#### SSL Configuration Commented Out
 
 **What Changed:**
 SSL configuration is now commented out by default (assumes Kamal handles SSL).
@@ -49,10 +49,10 @@ If using Kamal:
 
 ---
 
-#### 2. pool: → max_connections:
+#### pool: → max_connections:
 
 **What Changed:**
-Database configuration renames `pool:` to `max_connections:`.
+Database configuration renames `pool:` to `max_connections:`. `pool:` stays as a deprecated alias in 8.1 (warning, not an error); setting both keys to different values raises `Ambiguous configuration`.
 
 **Detection Pattern:**
 ```yaml
@@ -79,7 +79,7 @@ production:
 
 ---
 
-#### 3. bundler-audit Required
+#### bundler-audit Required
 
 **What Changed:**
 Rails 8.1 expects bundler-audit for security vulnerability scanning.
@@ -114,7 +114,7 @@ bundle audit check --update
 
 ### 🟡 MEDIUM PRIORITY
 
-#### 4. Semicolon Query Separator Removed
+#### Semicolon Query Separator Removed
 
 **What Changed:**
 Semicolons (`;`) can no longer be used as query parameter separators.
@@ -136,7 +136,7 @@ Semicolons (`;`) can no longer be used as query parameter separators.
 
 ---
 
-#### 5. Sidekiq Adapter Removed
+#### Sidekiq Adapter Removed
 
 **What Changed:**
 Built-in Sidekiq adapter removed from ActiveJob.
@@ -148,15 +148,15 @@ gem 'sidekiq', '< 6.5'
 ```
 
 **Fix:**
-Update Sidekiq to 6.5+ which includes its own adapter:
+Update Sidekiq to 7.3.3+, the first release that ships its own Active Job adapter:
 ```ruby
 # Gemfile
-gem 'sidekiq', '>= 6.5'
+gem 'sidekiq', '>= 7.3.3'
 ```
 
 ---
 
-#### 6. SuckerPunch Adapter Removed
+#### SuckerPunch Adapter Removed
 
 **What Changed:**
 Built-in SuckerPunch adapter removed.
@@ -170,7 +170,7 @@ gem 'sucker_punch', '>= 3.2'
 
 ---
 
-#### 7. Azure Storage Service Removed
+#### Azure Storage Service Removed
 
 **What Changed:**
 Azure storage service adapter removed from Active Storage.
@@ -190,7 +190,7 @@ azure:
 
 ### 🟢 LOW PRIORITY
 
-#### 8. schema.rb Column Sorting Change
+#### schema.rb Column Sorting Change
 
 **What Changed:**
 Database columns in `schema.rb` are now sorted alphabetically instead of by creation order.
@@ -203,7 +203,7 @@ This is a cosmetic change. Your database structure is unaffected. You may see la
 
 ---
 
-#### 9. MySQL Unsigned Types Deprecation
+#### MySQL Unsigned Types Deprecation
 
 **What Changed:**
 MySQL `unsigned: true` generates deprecation warnings.
@@ -221,7 +221,7 @@ t.check_constraint "count >= 0"
 
 ---
 
-#### 10. .gitignore Update
+#### .gitignore Update
 
 **What Changed:**
 Recommended `.gitignore` pattern for credential keys changed.
@@ -251,7 +251,7 @@ gem 'rails', '~> 8.1.0'
 gem 'bundler-audit', group: :development
 
 # Update job adapters if using
-gem 'sidekiq', '>= 6.5'  # If using Sidekiq
+gem 'sidekiq', '>= 7.3.3'  # If using Sidekiq
 ```
 
 ```bash
@@ -302,34 +302,15 @@ rails app:update
 
 ---
 
-## Common Issues
+## Common Issues — Quick Reference
 
-### Issue: Database Connection Pool Error
+Error → section lookup for the most common errors encountered during this upgrade:
 
-**Error:** `unknown keyword: pool`
-
-**Cause:** Old configuration syntax
-
-**Fix:**
-```yaml
-max_connections: 5  # Not pool: 5
-```
-
-### Issue: SSL Redirect Not Working
-
-**Cause:** SSL config is commented out
-
-**Fix:**
-Uncomment `force_ssl` and `assume_ssl` in production.rb
-
-### Issue: Sidekiq Jobs Not Processing
-
-**Cause:** Using old Sidekiq version without built-in adapter
-
-**Fix:**
-```ruby
-gem 'sidekiq', '>= 6.5'
-```
+| Error | See |
+|-------|-----|
+| Deprecation warning for `pool:` in `database.yml`, or `Ambiguous configuration: 'pool' ... and 'max_connections'` | "pool: → max_connections:" — `max_connections: 5`, drop `pool:` |
+| SSL redirect not working in production | "SSL Configuration Commented Out" — uncomment `force_ssl` and `assume_ssl` in `production.rb` |
+| Sidekiq jobs not processing | "Sidekiq Adapter Removed" — `gem 'sidekiq', '>= 7.3.3'` |
 
 ---
 

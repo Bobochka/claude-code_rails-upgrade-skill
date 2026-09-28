@@ -24,7 +24,7 @@ The breaking changes are smaller than 3.2 → 4.0 but several silently change be
 
 ### 🔴 HIGH PRIORITY
 
-#### 1. Dynamic Finders Removed
+#### Dynamic Finders Removed
 
 **What Changed:**
 `activerecord-deprecated_finders` was removed as a Rails dependency. `find_all_by_*`, `find_last_by_*`, `scoped_by_*`, `find_or_initialize_by_*`, and `find_or_create_by_*` no longer work out of the box.
@@ -63,7 +63,7 @@ gem 'activerecord-deprecated_finders'
 
 ---
 
-#### 2. `return` Inside Inline Callback Blocks
+#### `return` Inside Inline Callback Blocks
 
 **What Changed:**
 Using `return` inside an **inline callback block** now raises `LocalJumpError` at callback-execution time. This was never officially supported; a rewrite of `ActiveSupport::Callbacks` in 4.1 closed the accidental support.
@@ -97,7 +97,7 @@ See [rails/rails#13271](https://github.com/rails/rails/pull/13271).
 
 ---
 
-#### 3. Implicit Join References Removed
+#### Implicit Join References Removed
 
 **What Changed:**
 `includes(...).where("other_table.col = ...")` no longer auto-joins the referenced table. The string-parsing heuristic was removed because it produced incorrect SQL in edge cases.
@@ -132,7 +132,7 @@ See [rails/rails#9712](https://github.com/rails/rails/issues/9712) for backgroun
 
 ---
 
-#### 4. PostgreSQL `json` / `hstore` / `array` Columns Return String-Keyed Data
+#### PostgreSQL `json` / `hstore` / `array` Columns Return String-Keyed Data
 
 **What Changed:**
 In 4.0, PostgreSQL `json`, `hstore`, and `array` columns (and any `store_accessor` built on top of them) returned a `HashWithIndifferentAccess` or `ArrayWithIndifferentAccess` — symbol and string access both worked. In 4.1 they return plain `Hash` or `Array` with **string keys only**. Symbol access silently returns `nil`.
@@ -162,7 +162,7 @@ profile.preferences["theme"]
 
 ---
 
-#### 5. `cache_digests` Gem Collides with Core Cache Digests
+#### `cache_digests` Gem Collides with Core Cache Digests
 
 **What Changed:**
 Rails 4.1 ships cache digests in core as `ActionView::Digestor`. The `cache_digests` gem that backported them to 4.0 does not merely go unused, it **collides**. actionview's `action_view/tasks/dependencies.rake` declares `class CacheDigests` inside a `namespace :cache_digests do` block, and a Rake namespace does not scope Ruby constants, so that defines top-level `::CacheDigests`. The gem defines `module CacheDigests`. Class against module on one constant raises while Rails loads its rake tasks:
@@ -209,7 +209,7 @@ Delete the gem outright once the current Rails is 4.1.
 
 ### 🟡 MEDIUM PRIORITY
 
-#### 6. MultiJSON Removed from Rails
+#### MultiJSON Removed from Rails
 
 **What Changed:**
 Rails 4.1 no longer depends on [`MultiJSON`](https://github.com/intridea/multi_json). Apps that reference `MultiJSON` directly will raise `NameError` once the transitive dependency goes away.
@@ -241,7 +241,7 @@ JSON.parse(str)
 
 ---
 
-#### 7. Cookies Serializer Opt-In (Marshal → JSON / Hybrid)
+#### Cookies Serializer Opt-In (Marshal → JSON / Hybrid)
 
 **What Changed:**
 Apps created before 4.1 keep `Marshal` as the signed/encrypted cookie serializer. Rails 4.1 introduces a JSON serializer and a `:hybrid` mode that reads legacy Marshal cookies and writes new JSON ones — but the default is still `Marshal` unless you opt in.
@@ -260,7 +260,7 @@ Once all live cookies have rotated, switch to `:json` for the leaner path. Note 
 
 ---
 
-#### 8. `default_scope` Chains with Other Scopes
+#### `default_scope` Chains with Other Scopes
 
 **What Changed:**
 In Rails 4.1, `default_scope` conditions are now combined (ANDed) with subsequent scopes instead of being overridden by them. Scopes that intentionally contradicted the default scope now produce zero rows.
@@ -289,7 +289,7 @@ See [this commit](https://github.com/rails/rails/commit/f950b2699f97749ef706c693
 
 ---
 
-#### 9. `ActiveRecord::Relation` Mutator Methods Removed
+#### `ActiveRecord::Relation` Mutator Methods Removed
 
 **What Changed:**
 `#map!`, `#delete_if`, `#compact!`, and other mutator methods are no longer delegated from `Relation` to the underlying array. Call `#to_a` first.
@@ -313,7 +313,7 @@ projects.compact!
 
 ---
 
-#### 10. CSRF Protection Now Covers GET with JS Responses
+#### CSRF Protection Now Covers GET with JS Responses
 
 **What Changed:**
 GET requests with JS responses now enforce CSRF. Test helpers that issue `get` / `post :create, format: :js` must switch to `xhr` so Rails treats the request as XHR.
@@ -341,7 +341,7 @@ See [rails/rails#13345](https://github.com/rails/rails/pull/13345).
 
 ---
 
-#### 11. Flash Message Keys Are Strings
+#### Flash Message Keys Are Strings
 
 **What Changed:**
 Keys in `flash.to_hash` are now strings, not symbols. Code that filters the hash with symbol keys silently no-ops.
@@ -365,7 +365,7 @@ Direct access with either symbol or string still works — the break is specific
 
 ---
 
-#### 12. I18n Enforces Available Locales
+#### I18n Enforces Available Locales
 
 **What Changed:**
 `config.i18n.enforce_available_locales` defaults to `true` in 4.1. Any locale that is not in `I18n.available_locales` raises `I18n::InvalidLocale`. Apps that accepted user-supplied locale parameters without validation will raise on previously-accepted input.
@@ -390,7 +390,7 @@ config.i18n.enforce_available_locales = false
 
 ---
 
-#### 13. `as_json` Millisecond Precision for Time/DateTime/TWZ
+#### `as_json` Millisecond Precision for Time/DateTime/TWZ
 
 **What Changed:**
 `Time`, `DateTime`, and `ActiveSupport::TimeWithZone` serialize to JSON with millisecond precision by default (`2024-01-01T00:00:00.000Z` instead of `2024-01-01T00:00:00Z`). API clients that parse the timestamp as a fixed-length string or match it against a regex break.
@@ -411,7 +411,7 @@ Or update consumers to accept fractional seconds.
 
 ### 🟢 LOW PRIORITY
 
-#### 14. Spring Preloader (New Default)
+#### Spring Preloader (New Default)
 
 **What Changed:**
 New 4.1 apps generate a `Gemfile` with `gem 'spring'` in `:development`, and a `bin/spring` binstub. Spring keeps the Rails environment in memory between commands.
@@ -427,7 +427,7 @@ Run `bundle exec spring binstub --all` to generate Spring-aware binstubs (`bin/r
 
 ---
 
-#### 15. `secrets.yml` (New)
+#### `secrets.yml` (New)
 
 **What Changed:**
 Rails 4.1 introduces `config/secrets.yml` as the recommended home for `secret_key_base` and other app secrets, accessible via `Rails.application.secrets`.
@@ -446,7 +446,7 @@ Migrate reads from `Rails.application.config.secret_key_base` or custom initiali
 
 ---
 
-#### 16. `render :text` Soft-Deprecated
+#### `render :text` Soft-Deprecated
 
 **What Changed:**
 `render :text` was a security-adjacent footgun — it sent `text/html`, so any string with markup would be interpreted by the browser. 4.1 introduces `render :plain`, `render :html`, and `render :body` as precise replacements, and signals that `:text` will be deprecated in a future release.
@@ -469,7 +469,7 @@ render body: "raw"           # no Content-Type header
 
 ---
 
-#### 17. JSON Encoder: Removed Features
+#### JSON Encoder: Removed Features
 
 **What Changed:**
 The 4.1 JSON encoder rewrite drops three features from `as_json` / `to_json`:
@@ -497,7 +497,7 @@ Or migrate `encode_json` implementations into `as_json`, and update clients to p
 
 ---
 
-#### 18. JSON Gem Isolated from Rails Encoder
+#### JSON Gem Isolated from Rails Encoder
 
 **What Changed:**
 `JSON.generate` / `JSON.dump` no longer consult Rails' `as_json`. They serialize arbitrary Ruby objects the way the stdlib `json` gem wants — which differs significantly. Use `obj.to_json` when you want Rails semantics.
@@ -521,7 +521,7 @@ JSON.generate(obj.as_json)
 
 ---
 
-#### 19. Fixtures ERB Evaluated in a Separate Context
+#### Fixtures ERB Evaluated in a Separate Context
 
 **What Changed:**
 Each fixture's ERB template now runs in its own isolated context. Helper methods defined in one fixture (`<% def my_helper; end %>`) are no longer visible from another fixture.
@@ -544,7 +544,7 @@ ActiveRecord::FixtureSet.context_class.send :include, FixtureFileHelpers
 
 ---
 
-#### 20. `ActiveSupport::Callbacks.set_callback` Around-Block Signature
+#### `ActiveSupport::Callbacks.set_callback` Around-Block Signature
 
 **What Changed:**
 The around-callback lambda signature changed from `&block` (yield-style) to a positional `block` argument.
@@ -567,7 +567,7 @@ Rare — only affects apps that build callbacks dynamically with `set_callback`.
 
 ---
 
-#### 21. `ActiveRecord::Migration.check_pending!` Now Redundant in Test Helper
+#### `ActiveRecord::Migration.check_pending!` Now Redundant in Test Helper
 
 **What Changed:**
 `require 'test_help'` now runs pending-migration checks automatically. Explicit calls to `ActiveRecord::Migration.check_pending!` in `test_helper.rb` / `rails_helper.rb` are harmless but unnecessary.
@@ -683,61 +683,21 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 
 ---
 
-## Common Issues
+## Common Issues — Quick Reference
 
-### Issue: App fails with `NameError: uninitialized constant MultiJSON`
+Error → section lookup for the most common errors encountered during this upgrade:
 
-**Cause:** MultiJSON no longer pulled in by Rails.
-
-**Fix:** Add `gem 'multi_json'` to the Gemfile, or migrate to `to_json` / `JSON.parse`.
-
-### Issue: `NoMethodError: undefined method 'find_all_by_email'`
-
-**Cause:** Dynamic finders removed.
-
-**Fix:** Rewrite as `where(email: email)` or add `gem 'activerecord-deprecated_finders'` temporarily.
-
-### Issue: Query returns zero rows after upgrade
-
-**Cause:** A scope intended to override `default_scope` is now ANDed with it.
-
-**Fix:** Use `unscope(where: :col)` or `rewhere(col: ...)`.
-
-### Issue: Controller tests raise `ActionController::InvalidAuthenticityToken` on JS endpoints
-
-**Cause:** CSRF now applies to GET + JS.
-
-**Fix:** Use `xhr :verb, :action, ...` instead of `verb :action, format: :js`.
-
-### Issue: `flash.to_hash.except(:notice)` silently keeps `:notice`
-
-**Cause:** Flash keys are strings now.
-
-**Fix:** Use `"notice"` instead of `:notice`.
-
-### Issue: `profile.preferences[:theme]` returns `nil` after upgrade
-
-**Cause:** PG `json` / `hstore` columns return string-keyed `Hash`, not `HashWithIndifferentAccess`.
-
-**Fix:** Index with string keys (`profile.preferences["theme"]`) or use the `store_accessor`-generated method.
-
-### Issue: `I18n::InvalidLocale` raised by a request that worked on 4.0
-
-**Cause:** `enforce_available_locales` is now `true` by default.
-
-**Fix:** Add the locale to `config.i18n.available_locales`, or disable enforcement if you have a strong reason.
-
-### Issue: Every `rake` task aborts with `TypeError: CacheDigests is not a class`
-
-**Cause:** The `cache_digests` backport gem is still in the 4.1 bundle and collides with the top-level `::CacheDigests` that actionview's `dependencies.rake` defines.
-
-**Fix:** `gem 'cache_digests' unless NextRails.next?` in the Gemfile, then migrate any direct `CacheDigests::*` calls to `ActionView::Digestor`.
-
-### Issue: API clients fail to parse `2024-01-01T00:00:00.000Z`
-
-**Cause:** JSON millisecond precision is on by default.
-
-**Fix:** `ActiveSupport::JSON::Encoding.time_precision = 0`, or update consumers.
+| Error | See |
+|-------|-----|
+| `NameError: uninitialized constant MultiJSON` | "MultiJSON Removed from Rails" — add `gem 'multi_json'` or move to `to_json` / `JSON.parse` |
+| `NoMethodError: undefined method 'find_all_by_email'` | "Dynamic Finders Removed" — rewrite as `where(email: email)`, or `activerecord-deprecated_finders` temporarily |
+| Query returns zero rows after upgrade | "`default_scope` Chains with Other Scopes" — use `unscope(where: :col)` or `rewhere` |
+| `ActionController::InvalidAuthenticityToken` in controller tests on JS endpoints | "CSRF Protection Now Covers GET with JS Responses" — use `xhr :verb, :action` |
+| `flash.to_hash.except(:notice)` silently keeps `:notice` | "Flash Message Keys Are Strings" — use `"notice"` |
+| `profile.preferences[:theme]` returns `nil` | "PostgreSQL `json` / `hstore` / `array` Columns Return String-Keyed Data" — index with string keys or `store_accessor` |
+| `I18n::InvalidLocale` on a request that worked on 4.0 | "I18n Enforces Available Locales" — add the locale to `config.i18n.available_locales` |
+| `TypeError: CacheDigests is not a class` from every `rake` task | "`cache_digests` Gem Collides with Core Cache Digests" — `gem 'cache_digests' unless NextRails.next?`, move `CacheDigests::*` calls to `ActionView::Digestor` |
+| API clients fail to parse `2024-01-01T00:00:00.000Z` | "`as_json` Millisecond Precision for Time/DateTime/TWZ" — `ActiveSupport::JSON::Encoding.time_precision = 0` or update consumers |
 
 ---
 

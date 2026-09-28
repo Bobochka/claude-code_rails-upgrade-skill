@@ -477,3 +477,77 @@ REMOTE_FORM_CSRF_TOKEN:
     - '= form_for @user do |f|'
     # the config pin itself, not a form
     - '    config.action_view.embed_authenticity_token_in_remote_forms = true'
+
+ORDER_WITHOUT_ARGUMENTS:
+  # Pattern: a bare order/reorder with nothing to sort by. Requires either a
+  # relation method right after the call, or empty / nil / [] arguments, so
+  # that reading an `order` association or column does not get flagged.
+  match:
+    - '        link = PersonConsentLink.where(person_id: person_id).order.last'
+    - '    scope.reorder.to_a'
+    - '    Widget.where(active: true).order.first'
+    - '    Widget.order().each { |w| puts w }'
+  no_match:
+    # reading an order association or column, by far the common case
+    - '    total = line_item.order.total'
+    - '    payment.order'
+    # already naming a column
+    - '    Widget.order(:id).last'
+    - '    Widget.order("id ASC").first'
+    - '    Widget.reorder(:created_at).to_a'
+    # method names that merely start with a relation method
+    - '    total = line_item.order.summary'
+    - '    items = invoice.order.selected_items'
+    - '    n = line_item.order.counts'
+    # nil / [] are not blank? once splatted, so these never raise on 4.0.
+    # reorder(nil) is the documented way to clear a default order.
+    - '    Widget.order(nil).count'
+    - '    Widget.reorder([]).pluck(:id)'
+    - '    Widget.reorder(nil).to_a'
+    # different method entirely
+    - '    Widget.order_by(:id).last'
+
+SQUEEL_ORDER_JOINED_TABLE:
+  # Pattern: a single-line order hash whose value is not :asc / :desc, with or
+  # without braces. A hash spread over several lines cannot be matched, since
+  # detection reads one line at a time.
+  match:
+    - '          .order(patient_groups: :id)'
+    - '          .order({ checklist_task_items: :month })'
+    - '    relation.order(:event => :start)'
+    - '    relation.order({:event => :start})'
+    # a :description column must not suppress a real finding on the same line
+    - '    relation.order(event: :start).where(:description => x)'
+  no_match:
+    # legitimate direction hashes
+    - '    Widget.order(name: :asc)'
+    - '    Widget.order(id: :desc)'
+    - '    Widget.order({ id: :desc })'
+    # method names merely ending in "order"
+    - '    work_order(status: :open)'
+    - '    set_sort_order(field: :name)'
+    # string and symbol forms are unaffected
+    - '    Widget.order("events.start ASC")'
+    - '    Widget.order(:start)'
+
+BELONGS_TO_DEPENDENT:
+  match:
+    - "  belongs_to :document, dependent: :destroy"
+    - "  belongs_to :content, polymorphic: true, dependent: :destroy"
+    - "  belongs_to :document, foreign_key: :resource_id, dependent: :destroy"
+    # 3.2-era hash-rocket syntax is common in the code being upgraded.
+    - "  belongs_to :document, :dependent => :destroy"
+    # Commented-out declarations are flagged on purpose: a commented cascade is
+    # still worth a look when tracing a cycle, and dropping it is a one-line dismissal.
+    - "  # belongs_to :document, dependent: :destroy"
+  no_match:
+    # dependent: :delete deletes without running callbacks, so it cannot close a
+    # cycle. :destroy and :delete are the only options belongs_to accepts (4.0
+    # builder/belongs_to.rb valid_dependent_options), so :destroy is the full set.
+    - "  belongs_to :brand, dependent: :delete"
+    # Only belongs_to moved phase in 4.0; has_one/has_many were already before_destroy.
+    - "  has_one :attachment, dependent: :destroy"
+    - "  has_many :comments, dependent: :destroy"
+    # A belongs_to without a cascade is unaffected.
+    - "  belongs_to :creator, class_name: \"Person\""
+    - "  belongs_to :organization"

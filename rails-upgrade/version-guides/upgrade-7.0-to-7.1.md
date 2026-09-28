@@ -21,7 +21,7 @@ Rails 7.1 introduces:
 
 ### 🔴 HIGH PRIORITY
 
-#### 1. cache_classes → enable_reloading
+#### cache_classes → enable_reloading
 
 **What Changed:**
 `config.cache_classes` is replaced by `config.enable_reloading` with **inverted** boolean logic.
@@ -52,7 +52,7 @@ config.enable_reloading = false  # Disable reloading (production)
 
 ---
 
-#### 2. Force SSL Default in Production
+#### Force SSL Default in Production
 
 **What Changed:**
 `config.force_ssl` is now `true` by default in production.
@@ -80,7 +80,7 @@ config.force_ssl = true  # Now the default
 
 ---
 
-#### 3. preview_path → preview_paths (Mailer)
+#### preview_path → preview_paths (Mailer)
 
 **What Changed:**
 Mailer preview path configuration changed from singular to plural.
@@ -101,7 +101,7 @@ config.action_mailer.preview_paths = ["#{Rails.root}/spec/mailers/previews"]
 
 ---
 
-#### 4. SQLite Database Location Changed
+#### SQLite Database Location Changed
 
 **What Changed:**
 SQLite databases now default to `storage/` instead of `db/`.
@@ -136,7 +136,7 @@ development:
 
 ---
 
-#### 5. lib/ Autoloaded by Default
+#### lib/ Autoloaded by Default
 
 **What Changed:**
 Files in `lib/` are now autoloaded by Zeitwerk.
@@ -163,7 +163,7 @@ Ensure files in `lib/` follow Zeitwerk naming:
 
 ---
 
-#### 6. legacy_connection_handling Removed
+#### legacy_connection_handling Removed
 
 **What Changed:**
 `config.active_record.legacy_connection_handling` was deprecated in Rails 7.0 and is **completely removed in Rails 7.1**. Setting it will raise an error on boot.
@@ -173,6 +173,9 @@ Ensure files in `lib/` follow Zeitwerk naming:
 # config/application.rb or config/environments/*.rb
 config.active_record.legacy_connection_handling = false
 config.active_record.legacy_connection_handling = true
+```
+```bash
+grep -rn "legacy_connection_handling" config/
 ```
 
 **Fix:**
@@ -199,7 +202,7 @@ end
 
 ### 🟡 MEDIUM PRIORITY
 
-#### 7. Query Log Tags Format
+#### Query Log Tags Format
 
 **What Changed:**
 New query log format options available.
@@ -218,10 +221,12 @@ config.active_record.query_log_tags_format = :sqlcommenter  # or :legacy
 
 ---
 
-#### 8. Cache Format Version 7.1
+#### Cache Format Version 7.1
 
 **What Changed:**
-New cache serialization format available.
+New cache serialization format available. 7.1 also **deprecates** the 6.1 format and removes it in 7.2.
+
+**This usually warns with no line in the codebase to find.** `cache_format_version` is rarely set explicitly — `config.load_defaults 5.1` / `6.0` / `6.1` implies the 6.1 format. An app that has not yet moved `load_defaults` past 6.1 warns on every boot under 7.1 with nothing to grep for, so a clean detection scan is inconclusive here. Check the app's `load_defaults` value instead.
 
 **Fix:**
 ```ruby
@@ -229,11 +234,13 @@ New cache serialization format available.
 config.active_support.cache_format_version = 7.1
 ```
 
-**Warning:** Don't enable until ALL servers are upgraded to 7.1.
+Or resolve it as part of the `load_defaults` bump in Step 7.
+
+**Warning:** Don't enable until ALL servers are upgraded to 7.1. During a rolling deploy, servers still on the old format read new-format entries as misses and vice versa, which can stampede the cache. Deploy the version bump first, then flip the format.
 
 ---
 
-#### 9. Content Security Policy Updates
+#### Content Security Policy Updates
 
 **What Changed:**
 CSP configuration syntax updated.
@@ -246,7 +253,7 @@ Review and update CSP directives as needed.
 
 ---
 
-#### 10. Secret Key File Location Changed
+#### Secret Key File Location Changed
 
 **What Changed:**
 The location of `secrets.yml.enc` has changed.
@@ -266,7 +273,7 @@ Note: Most applications use `credentials.yml.enc` instead, which is unaffected.
 
 ---
 
-#### 11. Active Record inspect Output Changed
+#### Active Record inspect Output Changed
 
 **What Changed:**
 `ActiveRecord::Core#inspect` now respects `attributes_for_inspect` configuration.
@@ -287,7 +294,7 @@ config.active_record.attributes_for_inspect = [:id, :name, :email]
 config.active_record.attributes_for_inspect = :all
 ```
 
-#### 12. `ActiveRecord::Migration.check_pending!` Deprecated
+#### `ActiveRecord::Migration.check_pending!` Deprecated
 
 **What Changed:**
 `ActiveRecord::Migration.check_pending!` is deprecated in favor of `check_all_pending!`, which loops through all configured databases. It still works in 7.1 but emits a deprecation warning, and is removed entirely in Rails 7.2. Commonly found in `test_helper.rb` or `rails_helper.rb`, but also set up by healthcheck gems (e.g. [`rails-healthcheck`](https://github.com/linqueta/rails-healthcheck)) to run on every `/healthcheck` request.
@@ -392,52 +399,16 @@ Update `config.load_defaults` to 7.1
 
 ---
 
-## Common Issues
+## Common Issues — Quick Reference
 
-### Issue: Code Not Reloading in Development
+Error → section lookup for the most common errors encountered during this upgrade:
 
-**Cause:** Wrong `enable_reloading` value
-
-**Fix:**
-```ruby
-# config/environments/development.rb
-config.enable_reloading = true  # Not false!
-```
-
-### Issue: SSL Redirect Loop
-
-**Cause:** `force_ssl = true` behind a proxy
-
-**Fix:**
-Configure your proxy to handle SSL, or:
-```ruby
-config.force_ssl = false
-```
-
-### Issue: Constant Not Found in lib/
-
-**Cause:** Naming doesn't match Zeitwerk expectations
-
-**Fix:**
-Ensure `lib/my_file.rb` defines `MyFile`
-
-### Issue: App Crashes on Boot with `legacy_connection_handling` Error
-
-**Cause:** `config.active_record.legacy_connection_handling` is set in a config file but was removed in Rails 7.1
-
-**Fix:**
-Remove the line entirely from all config files:
-```bash
-grep -rn "legacy_connection_handling" config/
-```
-Delete every occurrence found. For dual-boot compatibility:
-```ruby
-if NextRails.next?
-  # Do nothing — removed in 7.1
-else
-  config.active_record.legacy_connection_handling = false
-end
-```
+| Error | See |
+|-------|-----|
+| Code not reloading in development | "cache_classes → enable_reloading" — `enable_reloading = true` in development |
+| SSL redirect loop behind a proxy | "Force SSL Default in Production" — let the proxy handle SSL or set `force_ssl = false` |
+| Constant not found in `lib/` | "lib/ Autoloaded by Default" — `lib/my_file.rb` must define `MyFile` |
+| Boot crashes on `legacy_connection_handling` | "legacy_connection_handling Removed" — delete every occurrence; guard with `NextRails.next?` while dual-booting |
 
 ---
 
