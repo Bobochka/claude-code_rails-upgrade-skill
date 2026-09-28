@@ -311,10 +311,14 @@ FIXTURE_DATES:
     - "created_at: <%= 3.days.ago.to_s(:db) %>"
 
 UPDATE_ALL_TWO_ARG:
-  # The scanner matches file content, so a hash first argument and the
-  # conditions on later lines are reached too; fixtures cover one line.
+  # The whole-file scanner (scan_patterns.rb) also reaches a first argument
+  # and conditions on separate lines; a line-based search does not. Fixtures
+  # test one line at a time.
   match:
     - "User.update_all(\"active = false\", [\"id = ?\", 1])"
+    # array first argument
+    - "User.update_all([\"count = ?\", n], [\"id = ?\", id])"
+    - "User.update_all([\"count = ?\", n], id: id)"
     - "    User.update_all({ active: false }, { id: ids })"
     - "    self.class.update_all({ synced_at: now }, id: id)"
     - "    Item.update_all(\"price = 0\", \"archived = 1\")"
@@ -324,6 +328,8 @@ UPDATE_ALL_TWO_ARG:
     - "    Item.update_all \"price = 0\", \"archived = 1\""
   no_match:
     - "User.where(id: 1).update_all(active: false)"
+    # one array argument
+    - "User.where(id: 1).update_all([\"count = ?, name = ?\", n, name])"
     # one braceless hash argument
     - "    Widget.update_all(active: false, synced_at: now)"
     - "    admins.update_all is_owner: false"
