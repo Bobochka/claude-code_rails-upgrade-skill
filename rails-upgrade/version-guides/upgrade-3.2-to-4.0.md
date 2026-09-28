@@ -868,6 +868,58 @@ before rewriting a call.
 
 ---
 
+#### `Model.scoped` Deprecated
+
+**What Changed:**
+Rails 4.0 removed `scoped` from Active Record. The `activerecord-deprecated_finders` gem,
+which activerecord 4.0 depends on, adds it back with a warning on every call, with or
+without an options hash:
+
+```
+DEPRECATION WARNING: Model.scoped is deprecated. Please use Model.all instead.
+```
+
+Rails 4.1 drops the gem and `Model.scoped`, `relation.scoped` and `association.scoped`
+all raise `NoMethodError`.
+
+**Detection Pattern:**
+```ruby
+Post.scoped
+user.posts.scoped.where(published: true)
+Post.scoped(conditions: { published: true }, include: :author, order: "created_at DESC")
+
+# receiverless, inside the model
+scope :everyone, -> { scoped }
+def self.for_region(region)
+  region ? where(region: region) : scoped
+end
+```
+
+**Fix:**
+```ruby
+# BEFORE
+Post.scoped
+user.posts.scoped.where(published: true)
+Post.scoped(conditions: { published: true }, include: :author, order: "created_at DESC")
+scope :everyone, -> { scoped }
+
+# AFTER (Rails 3.2 and 4.0)
+Post.where(nil)
+user.posts.where(published: true)
+Post.where(published: true).includes(:author).order("created_at DESC")
+scope :everyone, -> { where(nil) }
+```
+
+`where(nil)` returns a Relation with no conditions on both versions. `all` is the 4.0
+replacement the warning names, but on 3.2 `all` loads the records into an Array, so a
+chained scope call after it breaks before the bump. Switch to `all` once the app is on 4.0.
+
+A local variable, a `let(:scoped)`, or an app object that defines its own `scoped` method
+(a query or presenter object) looks the same to a search. Check for a `def scoped` or
+`let(:scoped)` before rewriting.
+
+---
+
 ### 🟢 LOW PRIORITY (but commonly encountered)
 
 #### Fixture Dates Must Be Cast to Strings
@@ -1145,7 +1197,7 @@ bundle update rails
 1. Add lambda to all scopes
 2. **Migrate all association `:conditions`, `:order`, `:extend`, `:uniq` options to lambda syntax** (this is typically the highest-volume change)
 3. Rewrite `:finder_sql` associations as scopes or methods; remove `:readonly` options
-4. Rewrite `find_all_by_*`, `find_last_by_*`, `find_or_create_by_*` and `find_or_initialize_by_*` with `where` (`find_by_*` can stay)
+4. Replace `Model.scoped` with `where(nil)` and rewrite `find_all_by_*`, `find_last_by_*`, `find_or_create_by_*` and `find_or_initialize_by_*` with `where` (`find_by_*` can stay)
 5. Add HTTP methods to routes
 6. Migrate to Strong Parameters and remove `require 'strong_parameters'` calls
 7. Replace `rescue_action` with `rescue_from`
