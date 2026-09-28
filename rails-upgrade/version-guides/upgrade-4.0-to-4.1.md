@@ -823,9 +823,9 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 13. Remove MultiJSON usage or add it back to the `Gemfile` explicitly.
 14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
 15. Move association `:conditions` into scope lambdas, including every `has_and_belongs_to_many` (4.1 drops the option there without an error).
-15. Move association `:order` into scope lambdas, including every `has_one` and `has_and_belongs_to_many` (4.1 ignores the option there without an error).
-15. Replace association `uniq: true` with `-> { distinct }`, including every `has_and_belongs_to_many` (4.1 drops the option there without an error).
-15. Replace association `readonly: true` with `-> { readonly }` and delete redundant `readonly: false`, including on `has_and_belongs_to_many` (4.1 drops the option there without an error).
+16. Move association `:order` into scope lambdas, including every `has_one` and `has_and_belongs_to_many` (4.1 ignores the option there without an error).
+17. Replace association `uniq: true` with `-> { distinct }`, including every `has_and_belongs_to_many` (4.1 drops the option there without an error).
+18. Replace association `readonly: true` with `-> { readonly }` and delete redundant `readonly: false`, including on `has_and_belongs_to_many` (4.1 drops the option there without an error).
 
 ### Phase 6: Testing
 - Run full test suite.
