@@ -527,12 +527,15 @@ VALIDATES_AS_PARANOID:
     - '  # validates_as_paranoid'
 
 JS_COMPRESSOR_GEM_MISMATCH:
-  # Pattern: a Gemfile line declaring terser; `require: false` is the fixed state.
+  # Pattern: a Gemfile line declaring terser, unless the line before it is `else`
+  # (the 3.2 branch of the fix). Strings with \n stand for two consecutive lines.
   match:
     - 'gem "terser"'
     - "  gem 'terser', '~> 1.2'"
     # a trailing comment does not count as the fix
     - '  gem "terser" # needs require: false on the next side'
+    # unfixed, with an unrelated line before it
+    - "group :assets do\n  gem \"terser\""
   no_match:
     # the fixed next-side declaration, both hash syntaxes
     - '    gem "terser", require: false'
@@ -542,6 +545,11 @@ JS_COMPRESSOR_GEM_MISMATCH:
     - '  gem "closure-compiler"'
     # a commented-out declaration
     - '# gem "terser"'
+    # the fixed Gemfile: next-side line, then the 3.2 line in the else branch
+    - "    gem \"uglifier\", \">= 1.3.0\"\n    gem \"terser\", require: false"
+    - "  else\n    gem \"terser\""
+    - "  gem \"terser\" unless next?"
+    - "  gem 'terser' unless NextRails.next?"
 
 COLLECTION_PROXY_ENUMERABLE_GUARD:
   # Pattern: "(?:is_a\\?|kind_of\\?)\\s*\\(?\\s*Enumerable\\b"
