@@ -290,6 +290,41 @@ The chained form works on 3.2, 4.0 and 4.1. A call that also passes `distinct: t
 
 ---
 
+#### `count(distinct: true)` Silently Ignored
+
+**What Changed:**
+Rails 4.0 deprecates the `:distinct` option on `count` / `calculate` but still honors it. Rails 4.1 removes the handling: the options hash is accepted and never read, so the call runs a plain `COUNT` and **nothing raises**. With four items owned by two owners:
+
+```ruby
+Item.count(:owner_id, distinct: true)
+# 4.0: 2 (plus the deprecation warning)
+# 4.1: 4, the row count
+```
+
+`activerecord-deprecated_finders` does not bring it back: its `calculate` override hands `:distinct` to core, which ignores it.
+
+**Detection Pattern:**
+```ruby
+Item.count(:owner_id, distinct: true)
+Item.count(:owner_id, :distinct => true)
+Item.calculate(:count, :owner_id, distinct: true)
+```
+
+**Fix:**
+```ruby
+# BEFORE
+Item.count(:owner_id, distinct: true)
+Item.count(:owner_id, conditions: { color: "red" }, distinct: true)
+
+# AFTER
+Item.distinct.count(:owner_id)
+Item.where(color: "red").distinct.count(:owner_id)
+```
+
+Keep the column symbol so Rails still qualifies it with the table name. `Relation#distinct` exists on 4.0, so the rewrite works on both sides of a dual boot; prefer it over `uniq`, which Rails 5.0 deprecates. `count("DISTINCT items.owner_id")` is a different form that still works on 4.1.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### MultiJSON Removed from Rails
@@ -757,6 +792,7 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
 15. Move `update_all(updates, conditions)` conditions into a `where` chain.
 15. Move finder options on `count` / `sum` / `maximum` / ... (`conditions:`, `joins:`, `group:`) onto chained scopes.
+15. Replace `count(:col, distinct: true)` with `distinct.count(:col)`.
 
 ### Phase 6: Testing
 - Run full test suite.
@@ -779,6 +815,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `NoMethodError` on `find_all_by_*` (or another bridged call) with `activerecord-deprecated_finders` in the Gemfile | "Dynamic Finders Removed": add `require: 'active_record/deprecated_finders'` to the gem line |
 | `ArgumentError: wrong number of arguments (2 for 1)` from `update_all` | "`update_all` With a Conditions Argument Removed": move the conditions into `where(...)` |
 | `count(conditions: ...)` returns the total row count; `maximum(:col, group: ...)` returns a scalar instead of a Hash | "Calculations Silently Ignore Finder Options": chain `where` / `joins` / `group` before the calculation |
+| `count(:col, distinct: true)` returns the row count instead of the distinct count | "`count(distinct: true)` Silently Ignored": use `distinct.count(:col)` |
 | Query returns zero rows after upgrade | "`default_scope` Chains with Other Scopes" — use `unscope(where: :col)` or `rewhere` |
 | `ActionController::InvalidAuthenticityToken` in controller tests on JS endpoints | "CSRF Protection Now Covers GET with JS Responses" — use `xhr :verb, :action` |
 | `flash.to_hash.except(:notice)` silently keeps `:notice` | "Flash Message Keys Are Strings" — use `"notice"` |

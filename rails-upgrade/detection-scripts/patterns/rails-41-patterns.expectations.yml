@@ -82,3 +82,21 @@ CALCULATE_FINDER_OPTIONS:
     - "Item.count(:group_id)"
     - "Item.maximum(:price, sub_group: :color)"
     - "[1, 2, 3].sum"
+
+DISTINCT_COUNT_OPTION:
+  # A call split across lines (`count(:owner_id,\n  distinct: true)`) is
+  # reached by the scanner, which matches file content; fixtures are single lines.
+  match:
+    - "Item.count(:owner_id, distinct: true)"
+    - "Item.count(:owner_id, :distinct => true)"
+    - "  unique_owners: scope.count(:owner_id, distinct: true),"
+    - "Item.calculate(:count, :owner_id, distinct: true)"
+    - "Item.count(:owner_id, conditions: { color: \"red\" }, distinct: true)"
+  no_match:
+    - "Item.distinct.count(:owner_id)"
+    - "Item.uniq.count(:owner_id)"
+    - "Item.count(\"DISTINCT items.owner_id\")"
+    - "Item.count(select: \"distinct items.owner_id\")"
+    - "Item.count(:owner_id, distinct: false)"
+    - "Item.count(:owner_id, not_distinct: true)"
+    - "Item.where(distinct: true).count"

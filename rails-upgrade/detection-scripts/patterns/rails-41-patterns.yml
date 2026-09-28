@@ -119,6 +119,19 @@ upgrade_findings:
       fix: "Apply each option as a chained scope before the calculation and keep the column argument as written: `count(conditions: c)` becomes `where(c).count`; `maximum(:price, group: :color)` becomes `group(:color).maximum(:price)` (still a Hash); `sum(:price, joins: :orders, conditions: c)` becomes `joins(:orders).where(c).sum(:price)`; `count(select: \"DISTINCT items.id\")` becomes `select(\"DISTINCT items.id\").count`. The chained form works on Rails 3.2, 4.0 and 4.1. Loading activerecord-deprecated_finders on 4.1 restores the old behavior with a warning, but only with an explicit `require: \"active_record/deprecated_finders\"` in the Gemfile"
       variable_name: "CALCULATE_FINDER_OPTIONS"
 
+    - name: ":distinct option on count / calculate"
+      kind: breaking
+      pattern: "\\.(count|calculate)\\([^)]*(?<!\\w):?distinct(:|\\s*=>)\\s*true"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "spec/"
+        - "test/"
+      explanation: "Rails 4.0 core deprecates the `:distinct` option on `count` / `calculate` (`The :distinct option for Relation#count is deprecated. Please use Relation#distinct instead`) but still honors it. Rails 4.1 removes the handling: the options hash is accepted and never read, so `Item.count(:owner_id, distinct: true)` runs a plain COUNT and returns the number of rows, not the number of distinct values. Nothing raises. activerecord-deprecated_finders does not restore it: its `calculate` override passes `:distinct` through to core, which ignores it. The pattern flags `distinct: true` or `:distinct => true` inside a count / calculate call, including calls split across lines. `count(\"DISTINCT col\")` is a different form that still works and is not flagged. A call that also carries finder options (`conditions:`, `joins:`) is flagged by CALCULATE_FINDER_OPTIONS too; fix both in one edit"
+      fix: "Move it onto the relation: `rel.count(:col, distinct: true)` becomes `rel.distinct.count(:col)`. Keep the column symbol so Rails still qualifies it with the table name. `Relation#distinct` exists on 4.0, so the rewrite works on both sides of a dual boot, and it is the name later Rails versions keep (`uniq` is deprecated in 5.0). With finder options as well: `count(:col, conditions: c, distinct: true)` becomes `where(c).distinct.count(:col)`. `distinct: false` was the default and can simply be dropped"
+      variable_name: "DISTINCT_COUNT_OPTION"
+
   medium_priority:
     - name: "MultiJSON usage"
       kind: breaking
