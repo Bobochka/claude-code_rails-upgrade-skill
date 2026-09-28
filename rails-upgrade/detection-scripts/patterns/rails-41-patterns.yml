@@ -171,6 +171,19 @@ upgrade_findings:
       fix: "Replace rel.all with rel.to_a, which returns an Array on 4.0 and 4.1 and does not warn. Prefer to_a over the load the deprecation message also suggests: load returns the Relation, so it changes the return type. Where the caller only iterates (each, map), dropping .all also works, but keep to_a when the result is appended to with <<: on a has_many association of a saved record, << saves the new record. Leave Model.all, page.all(...) and custom all methods alone. As a short-term bridge, gem 'activerecord-deprecated_finders' restores the 4.0 behavior on 4.1"
       variable_name: "RELATION_ALL"
 
+    - name: "count on a relation with a multi-column select"
+      kind: breaking
+      pattern: "(?<![A-Za-z0-9_])select\\(\\s*(?:[\"'][^\"'\\n]*,[^\"'\\n]*[\"']|[\"'][^\"'\\n]*[\"']\\s*,\\s*[\"']|\\[[^\\]\\n]*,[^\\]\\n]*\\]|:[a-z_]+\\s*,\\s*:[a-z_]+)"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "spec/"
+        - "test/"
+      explanation: "Rails 4.0 ignores a select list that contains a comma or `*` when it builds a count, so Post.select(\"title, version\").count runs COUNT(*). Rails 4.1 passes the select list straight into COUNT, producing COUNT(title, version), which SQLite, PostgreSQL and MySQL all reject with ActiveRecord::StatementInvalid. The pattern flags the shapes a multi-column select takes: a comma inside one string, several string arguments, an array, and several symbols, called on a receiver or bare inside a scope body. A hit only breaks when something calls count with no argument on that relation, so trace the callers, including specs and any method that returns the relation. size is safe on 4.1 (it calls count(:all) when the relation is not loaded), and so is an explicit count(:all) or count(:column)"
+      fix: "Call count(:all) on the relation, which runs COUNT(*) on 4.0 and 4.1, or use size. Or stop handing a multi-column select relation to callers that count it"
+      variable_name: "COUNT_MULTI_COLUMN_SELECT"
+
   low_priority:
     - name: "Spring gem in Gemfile (presence check)"
       kind: optional

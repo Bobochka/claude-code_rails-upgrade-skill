@@ -440,6 +440,38 @@ The pattern flags every `.all` called without arguments. Most hits are `Model.al
 
 ---
 
+#### `count` on a Multi-Column `select` Builds Invalid SQL
+
+**What Changed:**
+Rails 4.0 ignores a `select` list that contains a comma or `*` when it builds a count, so the count runs `COUNT(*)`. Rails 4.1 passes the select list straight into `COUNT`:
+
+```
+ActiveRecord::StatementInvalid: SQLite3::SQLException: wrong number of arguments to function COUNT(): SELECT COUNT(title, version) FROM "posts"
+```
+
+PostgreSQL (`function count(...) does not exist`) and MySQL (`ERROR 1064`, a syntax error) reject it too. It only breaks when something calls `count` with no argument on that relation. `size` is safe on 4.1, because it calls `count(:all)` when the relation is not loaded.
+
+**Detection Pattern:**
+```ruby
+Post.select("title, version").count
+Post.select(:title, :version).count
+Post.select([:title, :version]).count
+scope :summary, -> { select("id, title") }  # counted later: Post.summary.count
+```
+
+**Fix:**
+```ruby
+# BEFORE
+Post.select("title, version").count
+
+# AFTER
+Post.select("title, version").count(:all)
+```
+
+The select and the `count` are often far apart: a scope or a method returns the relation and a caller, or a spec, counts it. Trace every caller of each flagged relation.
+
+---
+
 ### 🟢 LOW PRIORITY
 
 #### Spring Preloader (New Default)
@@ -704,6 +736,7 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 13. Remove MultiJSON usage or add it back to the `Gemfile` explicitly.
 14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
 15. Replace `.all` on relations and associations with `.to_a` (leave `Model.all` alone).
+15. Change `count` to `count(:all)` on relations that carry a multi-column `select`.
 
 ### Phase 6: Testing
 - Run full test suite.
@@ -731,6 +764,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `TypeError: CacheDigests is not a class` from every `rake` task | "`cache_digests` Gem Collides with Core Cache Digests" — `gem 'cache_digests' unless NextRails.next?`, move `CacheDigests::*` calls to `ActionView::Digestor` |
 | API clients fail to parse `2024-01-01T00:00:00.000Z` | "`as_json` Millisecond Precision for Time/DateTime/TWZ" — `ActiveSupport::JSON::Encoding.time_precision = 0` or update consumers |
 | `NoMethodError: undefined method 'sort!' for #<Post::ActiveRecord_Relation...>` on a `.all` result | "`Relation#all` Returns a Relation, Not an Array": replace `rel.all` with `rel.to_a` |
+| `ActiveRecord::StatementInvalid` with `SELECT COUNT(title, version)` | "`count` on a Multi-Column `select` Builds Invalid SQL": call `count(:all)` |
 
 ---
 

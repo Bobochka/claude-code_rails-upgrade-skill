@@ -43,3 +43,22 @@ RELATION_ALL:
     - "    return unless items.all? { |item| item.valid? }"
     - "    Post.all_published"
     - "    Post.where(published: true).to_a"
+
+COUNT_MULTI_COLUMN_SELECT:
+  # A hit is only a problem when the relation is later counted with no
+  # argument. That caller is often on another line or in another file, so
+  # the pattern flags the select and the triage traces the count.
+  match:
+    - "    Post.select(\"title, version\").count"
+    - "  scope :summary, -> { select('posts.id, posts.title') }"
+    - "    Post.select(\"title\", \"version\")"
+    - "    Post.select([:title, :version])"
+    - "    Post.select(:title, :version)"
+  no_match:
+    - "    Post.select(:title).count"
+    - "    Post.select(\"DISTINCT title\")"
+    - "    Post.select(\"COUNT(*) AS total\")"
+    - "    Post.select(\"title\").where(\"a, b\")"
+    - "    items.select { |item| item.valid? }"
+    # The lookbehind keeps the bare in-scope form while skipping longer names.
+    - "    multiselect(\"title, version\")"
