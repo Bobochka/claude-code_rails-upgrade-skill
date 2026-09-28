@@ -44,9 +44,10 @@ upgrade_findings:
       fix: "Remove explicit with: :exception as it's now the default"
       variable_name: "CSRF_PROTECTION"
 
+  medium_priority:
     - name: "update_attributes deprecated"
       kind: "deprecation"
-      pattern: "update_attributes[^_]"
+      pattern: "\\bupdate_attributes\\b"
       exclude: ""
       search_paths:
         - "app/"
@@ -55,7 +56,6 @@ upgrade_findings:
       fix: "Replace update_attributes with update"
       variable_name: "UPDATE_ATTRIBUTES"
 
-  medium_priority:
     - name: "ActionCable configuration"
       kind: "migration"
       pattern: "config.action_cable"

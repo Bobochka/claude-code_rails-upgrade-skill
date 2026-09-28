@@ -16,7 +16,9 @@ UPDATE_ATTRIBUTES:
     - "    @user.update_attributes(user_params)"
     - "  post.update_attributes!(title: 'New')"
     - "    record.send(:update_attributes, attrs)"
+    - "  alias_method :save_all, :update_attributes"
   no_match:
     - "    @user.update(user_params)"
     - "    @user.update_attribute(:name, 'New')"
     - "    @user.update_attributes_from_api(payload)"
+    - "    importer.batch_update_attributes(rows)"
