@@ -19,8 +19,9 @@
 #
 # Without --target or --patterns, the current Rails version is read from the
 # app's Gemfile.lock and the target is the next hop in version-guides/
-# (4.0 -> 4.1). When that hop has no patterns file (6.0 -> 6.1) the script
-# stops instead of scanning the following hop's patterns under the wrong label.
+# (4.0 -> 4.1). When that hop has no patterns file (6.0 -> 6.1), or no guide
+# starts at the current version (3.1), the script stops instead of scanning
+# another hop's patterns under the wrong label.
 #
 # Runs with the app's own Ruby, so it stays Ruby 2.1 compatible: stdlib only,
 # no `&.`, no `<<~`, no `String#match?`, no `Array#sum`, no `Dir.children`.
@@ -43,7 +44,8 @@
 # 4. A match may not span more than MAX_SPAN_LINES, so a loose pattern cannot
 #    rope two unrelated calls together.
 # 5. An entry whose search_paths resolve to no files is UNSCANNED, never zero
-#    hits, and an entry whose every site was dropped by exclude: is
+#    hits (except a path-based entry, rule 7, where an absent path is the
+#    clean answer), and an entry whose every site was dropped by exclude: is
 #    "suppressed", never clean. "Could not scan" and "scanned clean" are
 #    different answers.
 # 6. Packwerk packs, engines and components are searched too: a search_path
@@ -339,6 +341,12 @@ def guide_for(target)
   Dir[File.join(GUIDES_DIR, "upgrade-*-to-#{target}.md")].first
 end
 
+# The version a hop to `target` starts from (7.0 -> "6.1"), or nil.
+def guide_from(target)
+  g = guide_for(target)
+  g ? File.basename(g)[/\Aupgrade-(\d+\.\d+)-to-/, 1] : nil
+end
+
 # [[heading, first_line, last_line]] for every "## " and "#### " heading, so a
 # reader can open one entry by line range instead of loading the whole guide.
 def guide_index(path)
@@ -436,18 +444,18 @@ def render_markdown(meta, results, opts)
     out << "| Bucket | Priority | Kind | Pattern | Variable | Sites | Files |"
     out << "|--------|----------|------|---------|----------|------:|------:|"
     found.each do |r|
-      files = r[:hits].map(&:first).uniq.length
+      files = site_files(r).length
       out << "| #{r[:bucket_label]} | #{PRIORITY_LABEL[r[:priority]]} | #{r[:kind]} | #{md_cell(r[:name])} | `#{r[:variable]}` | #{r[:hits].length} | #{files} |"
     end
   end
   out << ""
   counts = KINDS.map { |k| "#{found.count { |r| r[:kind] == k }} #{k}" }.join(", ")
   total_sites = found.inject(0) { |t, r| t + r[:hits].length }
-  affected = found.flat_map { |r| r[:hits].map(&:first) }.uniq.length
+  affected = found.flat_map { |r| site_files(r) }.uniq.length
   out << "#{found.length} of #{results.length} patterns matched: #{total_sites} site(s) in #{affected} file(s). By kind: #{counts}."
-  zero = results.select { |r| r[:hits].empty? && r[:suppressed].empty? && r[:files_scanned] > 0 }
+  zero = results.select { |r| status_of(r) == "clean" }
   all_suppressed = results.select { |r| r[:hits].empty? && !r[:suppressed].empty? }
-  unscanned = results.select { |r| r[:files_scanned].zero? && r[:hits].empty? }
+  unscanned = results.select { |r| status_of(r) == "unscanned" }
   suppressed = results.reject { |r| r[:suppressed].empty? }
   out << "#{zero.length} scanned clean, #{unscanned.length} UNSCANNED, #{suppressed.length} with sites suppressed by `exclude:` " \
          "(#{all_suppressed.length} with every site suppressed, which is not the same as clean)."
@@ -476,7 +484,10 @@ def render_markdown(meta, results, opts)
     out << ""
     out << "## Scanned clean"
     out << ""
-    zero.each { |r| out << "- `#{r[:variable]}` #{r[:name]} (#{r[:files_scanned]} files scanned)" }
+    zero.each do |r|
+    note = r[:path_only] ? "path absent" : "#{r[:files_scanned]} files scanned"
+    out << "- `#{r[:variable]}` #{r[:name]} (#{note})"
+  end
   end
 
   unless suppressed.empty?
@@ -507,10 +518,18 @@ def render_markdown(meta, results, opts)
   out.join("\n") + "\n"
 end
 
+# Files with a line-level site. Path-only sites (a directory that exists, no
+# line) are not files, so markdown and JSON count the same way.
+def site_files(r)
+  r[:hits].select { |h| h[1] }.map(&:first).uniq
+end
+
 def status_of(r)
   if !r[:hits].empty? then "found"
   elsif !r[:suppressed].empty? then "suppressed"
-  elsif r[:files_scanned].zero? then "unscanned"
+  # A path-based entry (pattern: "") asks whether the path exists, so an
+  # absent path is its clean answer, not a failure to scan.
+  elsif r[:files_scanned].zero? && !r[:path_only] then "unscanned"
   else "clean"
   end
 end
@@ -527,8 +546,7 @@ def render_json(meta, results)
       "patterns_checked" => results.length,
       "patterns_fired" => found.length,
       "sites" => found.inject(0) { |t, r| t + r[:hits].length },
-      # Path-only sites (a directory that exists, no line) are not files.
-      "files" => found.flat_map { |r| r[:hits].select { |h| h[1] }.map(&:first) }.uniq.length,
+      "files" => found.flat_map { |r| site_files(r) }.uniq.length,
       "by_kind" => by_kind,
       "unscanned" => results.select { |r| status_of(r) == "unscanned" }.map { |r| r[:variable] },
       "suppressed" => results.select { |r| status_of(r) == "suppressed" }.map { |r| r[:variable] }
@@ -633,11 +651,16 @@ def self_test
     check.call("missing path is unscanned", r[:files_scanned].zero? && r[:hits].empty?)
     r = s.scan("pattern" => "", "exclude" => "", "search_paths" => ["vendor/plugins/"])
     check.call("empty pattern is path-based and honours a named vendor path", r[:hits].length == 1)
+    r = s.scan("pattern" => "", "exclude" => "", "search_paths" => ["engines/plugins/"])
+    check.call("a path-based entry with the path absent is clean, not unscanned", status_of(r) == "clean")
+    check.call("a path-only site is not counted as a file", site_files(s.scan("pattern" => "", "exclude" => "", "search_paths" => ["vendor/plugins/"])).empty?)
     r = s.scan("pattern" => "\\.count\\([^)]*conditions:", "exclude" => "", "search_paths" => ["app/badbyte.rb"])
     check.call("invalid byte keeps the file's hits", r[:hits].length == 2)
     check.call("reads the hop from Gemfile.lock", lock_rails_version(File.join(dir, "Gemfile.lock")) == "4.0")
   end
   check.call("the 6.0 hop is 6.1 per the guides, not the next patterns file", guide_hop("6.0") == "6.1")
+  check.call("no guide starts at 3.1, so there is no hop to fall back to", guide_hop("3.1").nil?)
+  check.call("the hop to 7.0 starts at 6.1", guide_from("7.0") == "6.1")
   # Every shipped guide indexes to well-formed ranges, and a `# BEFORE` comment
   # inside a code fence is not taken for a heading.
   Dir[File.join(GUIDES_DIR, "upgrade-*.md")].each do |g|
@@ -713,8 +736,11 @@ if $PROGRAM_NAME == __FILE__
       hop_source = "--target"
     else
       abort("scan_patterns: no Gemfile.lock with rails in #{root}; pass --target X.Y") unless current
-      target = guide_hop(current) || available_versions.find { |v| (version_key(v) <=> version_key(current)) > 0 }
-      abort("scan_patterns: no patterns file newer than Rails #{current}") unless target
+      target = guide_hop(current)
+      unless target
+        abort("scan_patterns: no version guide starts at Rails #{current}, so the next hop is unknown. " \
+              "Pass --target X.Y to scan a hop on purpose. Available patterns: #{available_versions.join(', ')}")
+      end
       unless File.file?(patterns_file_for(target))
         abort("scan_patterns: the next hop is Rails #{current} -> #{target}, which has no patterns file. " \
               "Detect it from the version guide by hand, or pass --target X.Y to scan another hop on purpose.")
@@ -740,8 +766,11 @@ if $PROGRAM_NAME == __FILE__
             "(use the variable_name, e.g. #{results.first && results.first[:variable]})")
     end
   end
+  # The hop's start comes from the guide that ends at the target, so --target
+  # 7.0 on a 4.0 app reads 6.1 -> 7.0, not 4.0 -> 7.0. Gemfile.lock is the
+  # fallback when no guide ends there.
   meta = {
-    :from => current, :to => target, :root => root, :hop_source => hop_source, :modular_roots => roots,
+    :from => guide_from(target) || current, :to => target, :root => root, :hop_source => hop_source, :modular_roots => roots,
     :patterns_rel => patterns.sub(%r{\A.*/(detection-scripts/)}, '\1')
   }
   text = opts[:format] == "json" ? render_json(meta, results) : render_markdown(meta, results, opts)

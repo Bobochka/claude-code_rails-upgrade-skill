@@ -96,7 +96,7 @@ ruby <skill>/detection-scripts/scan_patterns.rb --summary
 
 The JSON file is the record Workflow 08 reads. `--output` creates `tmp/` if the app has none, deletes any earlier file first and writes the new one only when the scan succeeds, so after a failed run there is no file rather than a stale or empty one. Read the `--summary` output here, not the full detail: on a large app the full markdown runs to tens of thousands of tokens. For the per-site table of the patterns that fired, run `--only VAR1,VAR2` for a few at a time.
 
-`<skill>` is this skill's directory, the one holding `SKILL.md`. With no arguments the script reads the current Rails version from `Gemfile.lock` and scans the next hop listed in `version-guides/` (4.0 -> 4.1). `Gemfile.lock` stays on the current version while `Gemfile.next.lock` carries the target, so the default is right for the usual flow. Pass `--target X.Y` when `Gemfile.lock` already pins the target version, or to scan a later hop of a multi-hop plan. When the next hop has no patterns file (6.0 -> 6.1), the script stops and says so rather than scanning the following hop's patterns.
+`<skill>` is this skill's directory, the one holding `SKILL.md`. With no arguments the script reads the current Rails version from `Gemfile.lock` and scans the next hop listed in `version-guides/` (4.0 -> 4.1). `Gemfile.lock` stays on the current version while `Gemfile.next.lock` carries the target, so the default is right for the usual flow. Pass `--target X.Y` when `Gemfile.lock` already pins the target version, or to scan a later hop of a multi-hop plan. When the next hop has no patterns file (6.0 -> 6.1), or no version guide starts at the current version (3.1), the script stops and says so rather than scanning another hop's patterns. The report header and the JSON `from` are the start of the hop being scanned, taken from the version guide that ends at the target, so `--target 7.0` reads 6.1 -> 7.0 whatever `Gemfile.lock` pins.
 
 Without `--summary` the output is markdown:
 
@@ -104,7 +104,7 @@ Without `--summary` the output is markdown:
 - one section per matched pattern with its `fix:` and a `file:line | code` table;
 - **Scanned clean**: patterns whose search_paths had files and no match;
 - **Suppressed by exclude**: sites the pattern matched that `exclude:` dropped;
-- **UNSCANNED**: patterns whose search_paths resolved to no files in this app.
+- **UNSCANNED**: patterns whose search_paths resolved to no files in this app. A path-based pattern (`pattern: ""`, such as `VENDOR_PLUGINS`) is never UNSCANNED: its path being absent is the clean answer.
 
 Flags: `--summary` prints only the summary and the status lists; `--only VAR1,VAR2` prints the per-site detail for those patterns only; `--explain VAR1,VAR2` prints those patterns' explanation, fix and `prereqs:` plus a line-numbered index of the version guide's entries, without scanning; `--format json` prints a `summary` block (patterns checked and fired, sites, files, counts by kind, unscanned and fully suppressed patterns) and one object per pattern with its bucket, status (`found` / `clean` / `suppressed` / `unscanned`), explanation, fix, `prereqs:` and sites; `--show-suppressed` lists every suppressed site.
 
