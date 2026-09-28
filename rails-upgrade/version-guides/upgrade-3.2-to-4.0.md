@@ -920,6 +920,46 @@ A local variable, a `let(:scoped)`, or an app object that defines its own `scope
 
 ---
 
+#### `update_all` With Conditions Deprecated
+
+**What Changed:**
+Rails 3.2 accepted `update_all(updates, conditions, options)`. Rails 4.0 core takes only
+`update_all(updates)`; the `activerecord-deprecated_finders` gem, which activerecord 4.0
+depends on, keeps the extra arguments working with a warning:
+
+```
+DEPRECATION WARNING: Relation#update_all with conditions is deprecated. Please use Item.where(color: 'red').update_all(...) rather than Item.update_all(..., color: 'red').
+```
+
+A `:limit` / `:order` options hash gets a second warning. Rails 4.1 drops the gem and the
+call raises `ArgumentError: wrong number of arguments`.
+
+**Detection Pattern:**
+```ruby
+User.update_all({ active: false }, { id: ids })
+User.update_all("active = 0", ["created_at < ?", cutoff])
+Product.update_all(attrs, { sku: sku }, limit: 1)
+self.class.update_all({ synced_at: now }, id: id)
+```
+
+**Fix:**
+```ruby
+# BEFORE
+User.update_all({ active: false }, { id: ids })
+User.update_all("active = 0", ["created_at < ?", cutoff])
+Product.update_all(attrs, { sku: sku }, limit: 1)
+
+# AFTER (Rails 3.2 and 4.0)
+User.where(id: ids).update_all(active: false)
+User.where("created_at < ?", cutoff).update_all("active = 0")
+Product.where(sku: sku).limit(1).update_all(attrs)
+```
+
+A single braceless hash, `update_all(active: false, synced_at: now)`, is one argument and
+needs no change.
+
+---
+
 ### 🟢 LOW PRIORITY (but commonly encountered)
 
 #### Fixture Dates Must Be Cast to Strings
@@ -1197,7 +1237,7 @@ bundle update rails
 1. Add lambda to all scopes
 2. **Migrate all association `:conditions`, `:order`, `:extend`, `:uniq` options to lambda syntax** (this is typically the highest-volume change)
 3. Rewrite `:finder_sql` associations as scopes or methods; remove `:readonly` options
-4. Replace `Model.scoped` with `where(nil)` and rewrite `find_all_by_*`, `find_last_by_*`, `find_or_create_by_*` and `find_or_initialize_by_*` with `where` (`find_by_*` can stay)
+4. Replace `Model.scoped` with `where(nil)` and rewrite `find_all_by_*`, `find_last_by_*`, `find_or_create_by_*` and `find_or_initialize_by_*` with `where` (`find_by_*` can stay), and move `update_all` conditions into `where`
 5. Add HTTP methods to routes
 6. Migrate to Strong Parameters and remove `require 'strong_parameters'` calls
 7. Replace `rescue_action` with `rescue_from`

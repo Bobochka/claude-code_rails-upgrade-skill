@@ -306,10 +306,30 @@ FIXTURE_DATES:
     - "created_at: <%= 3.days.ago.to_s(:db) %>"
 
 UPDATE_ALL_TWO_ARG:
+  # The scanner matches file content, so a hash first argument and the
+  # conditions on later lines are reached too; fixtures cover one line.
   match:
     - "User.update_all(\"active = false\", [\"id = ?\", 1])"
+    - "    User.update_all({ active: false }, { id: ids })"
+    - "    self.class.update_all({ synced_at: now }, id: id)"
+    - "    Item.update_all(\"price = 0\", \"archived = 1\")"
+    - "    Product.update_all(row.to_hash, { sku: row[:sku] }, limit: 1)"
+    - "      update_all(values, lookup_column => value)"
+    - "  model.update_all(set_sql(column), where_sql(column))"
+    - "    Item.update_all \"price = 0\", \"archived = 1\""
   no_match:
     - "User.where(id: 1).update_all(active: false)"
+    # one braceless hash argument
+    - "    Widget.update_all(active: false, synced_at: now)"
+    - "    admins.update_all is_owner: false"
+    - "    Widget.update_all(:active => false, :synced_at => now)"
+    # commas inside the single argument
+    - "      .update_all(assignments.join(\", \"))"
+    - "    Report.where(id: report.id).update_all(tags: [\"a\", \"b\"].to_yaml)"
+    - "    Widget.update_all(\"name = x, code = y\")"
+    # a method whose name ends in update_all
+    - "    batch_update_all(rows, { id: 1 })"
+    - "  # update_all(set, conditions) is gone in 4.1"
 
 OLD_FINDER:
   match:
