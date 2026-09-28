@@ -162,6 +162,51 @@ profile.preferences["theme"]
 
 ---
 
+#### `cache_digests` Gem Collides with Core Cache Digests
+
+**What Changed:**
+Rails 4.1 ships cache digests in core as `ActionView::Digestor`. The `cache_digests` gem that backported them to 4.0 does not merely go unused, it **collides**. actionview's `action_view/tasks/dependencies.rake` declares `class CacheDigests` inside a `namespace :cache_digests do` block, and a Rake namespace does not scope Ruby constants, so that defines top-level `::CacheDigests`. The gem defines `module CacheDigests`. Class against module on one constant raises while Rails loads its rake tasks:
+
+```
+rake aborted!
+TypeError: CacheDigests is not a class
+actionview-4.1.16/lib/action_view/tasks/dependencies.rake:14
+```
+
+The blast radius is the whole rake surface, not one task: every `rake` invocation dies before running, so asset precompile, db tasks, and any CI step that shells out to rake fail together. It does **not** reproduce under `rails runner` or the test suite, because neither loads rake tasks. A boot smoke test and a green suite can both pass while CI is entirely red.
+
+**Detection Pattern:**
+```ruby
+# Gemfile
+gem 'cache_digests'
+
+# anywhere in app/ lib/ config/
+CacheDigests::TemplateDigestor.digest(...)
+CacheDigests.cache = ...
+```
+
+**Fix:**
+```ruby
+# Gemfile — gate it out of the 4.1 bundle; do not delete it while the current
+# bundle is still 4.0 and depends on it
+gem 'cache_digests' unless NextRails.next?
+```
+
+Then confirm nothing first-party reaches the gem's API, because core's is not call-compatible:
+
+| `cache_digests` gem | Rails 4.1 core |
+|---|---|
+| `CacheDigests::TemplateDigestor.digest(name, format, finder, options)` (positional) | `ActionView::Digestor.digest(name:, finder:, dependencies:, partial:)` (single options hash) |
+| `cache_prefix`, swappable `cache` accessor | gone — fixed `ThreadSafe::Cache` under a monitor, stored only when `Resolver.caching?` |
+| `cache ['v3', @post]` explicitly-versioned key | gone — only `skip_digest: true` remains |
+| `view_cache_dependency` | unchanged, in `ActionView::Helpers::CacheHelper` |
+
+Core's ERB dependency tracker also detects **more** dependencies than the gem's (it parses `layout:` keys and method chains), so fragment digests can move. That is a cold fragment cache on the first deploy, not an error. An app with no `cache` call in any view has nothing to verify here.
+
+Delete the gem outright once the current Rails is 4.1.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### MultiJSON Removed from Rails
@@ -593,6 +638,9 @@ gem 'rails', '~> 4.1.16'  # pin to the last 4.1 patch
 # Only if you depend on removed JSON encoder features
 # gem 'activesupport-json_encoder'
 
+# Required if present: collides with core's ::CacheDigests and aborts every rake task
+gem 'cache_digests' unless NextRails.next?
+
 group :development do
   gem 'spring'
 end
@@ -623,9 +671,11 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 11. Replace `render :text` with `:plain` / `:html` / `:body`.
 12. Pin JSON time precision if clients need it (`time_precision = 0`).
 13. Remove MultiJSON usage or add it back to the `Gemfile` explicitly.
+14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
 
 ### Phase 6: Testing
 - Run full test suite.
+- Run `bin/rake -T` — it loads every rake task and catches constant collisions the suite and a boot smoke test both miss.
 - Exercise controller specs that hit JS endpoints.
 - Exercise models with `default_scope` and `after_*` callbacks.
 - Verify flash-based UI and any cookie-backed session flows.
@@ -646,6 +696,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `flash.to_hash.except(:notice)` silently keeps `:notice` | "Flash Message Keys Are Strings" — use `"notice"` |
 | `profile.preferences[:theme]` returns `nil` | "PostgreSQL `json` / `hstore` / `array` Columns Return String-Keyed Data" — index with string keys or `store_accessor` |
 | `I18n::InvalidLocale` on a request that worked on 4.0 | "I18n Enforces Available Locales" — add the locale to `config.i18n.available_locales` |
+| `TypeError: CacheDigests is not a class` from every `rake` task | "`cache_digests` Gem Collides with Core Cache Digests" — `gem 'cache_digests' unless NextRails.next?`, move `CacheDigests::*` calls to `ActionView::Digestor` |
 | API clients fail to parse `2024-01-01T00:00:00.000Z` | "`as_json` Millisecond Precision for Time/DateTime/TWZ" — `ActiveSupport::JSON::Encoding.time_precision = 0` or update consumers |
 
 ---
