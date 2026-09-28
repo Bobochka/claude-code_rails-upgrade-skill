@@ -61,3 +61,13 @@ ASSOCIATION_UNIQ:
     - "  has_many :tags, -> { distinct }, through: :taggings"
     - "  has_many :tags, -> { uniq }, through: :taggings"
     - "  has_many :unique_visits, dependent: :destroy"
+
+ASSOCIATION_READONLY:
+  match:
+    - "  has_many :tags, through: :taggings, readonly: false"
+    - "  has_many :line_items, :through => :orders, :readonly => true"
+    - "  has_and_belongs_to_many :roles, readonly: true"
+  no_match:
+    - "  has_many :tags, -> { readonly }, through: :taggings"
+    - "  has_many :tags, -> { readonly(false) }, through: :taggings"
+    - "  has_many :tags, through: :taggings"

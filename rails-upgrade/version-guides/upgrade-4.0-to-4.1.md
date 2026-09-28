@@ -320,6 +320,43 @@ has_and_belongs_to_many :roles, -> { distinct }
 
 ---
 
+#### Association `:readonly` Option Removed
+
+**What Changed:**
+Rails 4.1 no longer depends on `activerecord-deprecated_finders`, the gem that kept `:readonly` working (with a deprecation warning) on 4.0. Without it, `has_many` (with or without `:through`), `has_one` and `belongs_to` reject the key when the model class loads:
+
+```
+ArgumentError: Unknown key: :readonly. Valid keys are: :class_name, :anonymous_class, :foreign_key, ...
+```
+
+The app fails to boot or eager load, and every test that touches the model fails.
+
+`has_and_belongs_to_many` fails silently instead. 4.1 rebuilds it as a `has_many :through` and passes on only a fixed list of options (`:before_add`, `:after_add`, `:before_remove`, `:after_remove`, `:autosave`, `:validate`, `:join_table`). `:readonly` is dropped with no error and no warning. The bridge gem does not change this.
+
+**Detection Pattern:**
+```ruby
+has_many :tags, through: :taggings, readonly: false
+has_many :line_items, :through => :orders, :readonly => true
+has_and_belongs_to_many :roles, readonly: true
+```
+
+**Fix:**
+```ruby
+# BEFORE
+has_many :tags, through: :taggings, readonly: false
+has_many :line_items, :through => :orders, :readonly => true
+has_and_belongs_to_many :roles, readonly: true
+
+# AFTER
+has_many :tags, through: :taggings
+has_many :line_items, -> { readonly }, through: :orders
+has_and_belongs_to_many :roles, -> { readonly }
+```
+
+`readonly: false` can usually be deleted. Rails 4.1 removed `implicit_readonly`, so records loaded through a join are no longer marked readonly and there is nothing left to undo. If the association must stay writable on 4.0 as well, write `-> { readonly(false) }` instead. The lambda form works on 4.0 and 4.1. As a short-term bridge, `gem 'activerecord-deprecated_finders'` restores `:readonly` on `has_many`. It does not fix `has_and_belongs_to_many`.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### MultiJSON Removed from Rails
@@ -788,6 +825,7 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 15. Move association `:conditions` into scope lambdas, including every `has_and_belongs_to_many` (4.1 drops the option there without an error).
 15. Move association `:order` into scope lambdas, including every `has_one` and `has_and_belongs_to_many` (4.1 ignores the option there without an error).
 15. Replace association `uniq: true` with `-> { distinct }`, including every `has_and_belongs_to_many` (4.1 drops the option there without an error).
+15. Replace association `readonly: true` with `-> { readonly }` and delete redundant `readonly: false`, including on `has_and_belongs_to_many` (4.1 drops the option there without an error).
 
 ### Phase 6: Testing
 - Run full test suite.
@@ -820,6 +858,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `has_one` or `has_and_belongs_to_many` returns rows in a different order | "Association `:order` Option Removed": 4.1 ignores `:order` there without an error, use a scope lambda |
 | `ArgumentError: Unknown key: :uniq` when a model loads | "Association `:uniq` Option Removed": use `-> { distinct }` |
 | `has_and_belongs_to_many` returns duplicate records | "Association `:uniq` Option Removed": 4.1 drops `:uniq` there without an error, use `-> { distinct }` |
+| `ArgumentError: Unknown key: :readonly` when a model loads | "Association `:readonly` Option Removed": use `-> { readonly }`, or delete `readonly: false` |
 
 ---
 
