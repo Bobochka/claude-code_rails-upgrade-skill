@@ -99,8 +99,9 @@ CALCULATE_FINDER_OPTIONS:
     - "[1, 2, 3].sum"
 
 DISTINCT_COUNT_OPTION:
-  # A call split across lines (`count(:owner_id,\n  distinct: true)`) is
-  # reached by the scanner, which matches file content; fixtures are single lines.
+  # A call split across lines (`count(:owner_id,\n  distinct: true)`) matches
+  # only in the whole-file scanner (detection-scripts/scan_patterns.rb); a
+  # line-based search sees single-line calls only. Fixtures are single lines.
   match:
     - "Item.count(:owner_id, distinct: true)"
     - "Item.count(:owner_id, :distinct => true)"
