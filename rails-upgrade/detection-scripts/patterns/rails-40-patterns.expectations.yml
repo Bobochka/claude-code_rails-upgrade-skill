@@ -598,8 +598,29 @@ REMOTE_FORM_CSRF_TOKEN:
     - '  <%= form_tag(search_path, remote: true) do %>'
     - '= form_for @person, :remote => true, html: { class: "opt-in-form" } do |f|'
     - '= simple_form_for @user, remote: true do |f|'
-    - '= form_for [clinic, patient], url: settings_path, remote: true do |f|'
+    - '= form_for [account, member], url: settings_path, remote: true do |f|'
+    # html: { remote: true } is turned into data-remote the same way
+    - '= form_for @note, html: { remote: true, class: "note-form" } do |f|'
+    # an explicit data-remote key in the html options, rocket and quoted-symbol forms
+    - '= form_for [project, task], :builder => TaskFormBuilder, :html => { :"data-remote" => true } do |f|'
+    - '  <%= form_tag search_path, "data-remote": "true" do %>'
+    - '= semantic_form_for @order, remote: true do |f|'
+    # options hash built on an earlier line, then passed to a form helper
+    - '    html_options[:"data-remote"] = true'
+    - '    form_options[:remote] = true'
   no_match:
+    # data: { remote: true } keeps the hidden token on 4.0
+    - '= form_for @note, html: { data: { remote: true } } do |f|'
+    # link options hash literal, not an assignment
+    - "    { \"data-remote\": \"true\", \"data-type\": \"html\" }"
+    # a hand-written form tag gets no token from Rails on either version
+    - "  %form#search{ action: search_path, :\"data-remote\" => true }"
+    # commented-out forms in HAML, ERB and Ruby
+    - '-#= form_for @report, url: reports_path, remote: true do |f|'
+    - '<%#= form_for @report, remote: true do |f| %>'
+    - '  # form_for @report, remote: true'
+    # a longer method name that merely ends in form_for
+    - '= custom_form_for_widget @report, remote: true'
     # remote link_to: UJS builds the form and its token itself
     - '= link_to "Delete", user_path(user), remote: true, method: :delete'
     # button_to renders its own token_tag on POST, regardless of this config

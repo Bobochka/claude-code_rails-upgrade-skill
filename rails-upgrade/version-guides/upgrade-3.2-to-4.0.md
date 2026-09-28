@@ -435,8 +435,9 @@ the test environment, so no token is rendered in tests either way.
 
 **Detection Pattern:**
 ```bash
-# remote forms whose submit path needs auditing, both hash syntaxes
-grep -rnE "remote:\s*true|:remote\s*=>\s*true" app/views/ app/helpers/
+# remote forms whose submit path needs auditing, both hash syntaxes,
+# plus an explicit "data-remote" key in the form's html options
+grep -rnE "remote:\s*true|:remote\s*=>\s*true|[\"']data-remote[\"']" app/views/ app/helpers/
 
 # confirm the app never pinned the config
 grep -rn "embed_authenticity_token_in_remote_forms" config/
@@ -448,6 +449,12 @@ BUNDLE_GEMFILE=Gemfile.next bundle exec rails runner 'puts ActionView::Helpers::
 
 Remote `link_to` / `button_to` links are safe: UJS builds their form and token itself.
 The grep is a list of forms to audit, not a list of forms to change.
+
+The flip keys on the literal `data-remote` html option. `remote: true`,
+`html: { remote: true }` and `html: { "data-remote" => true }` all drop the token on 4.0,
+including when a helper builds that hash on an earlier line
+(`html_options[:"data-remote"] = true`). `data: { remote: true }` does not: the form
+still renders `data-remote="true"`, but the hidden token stays.
 
 **Fix:**
 ```ruby
