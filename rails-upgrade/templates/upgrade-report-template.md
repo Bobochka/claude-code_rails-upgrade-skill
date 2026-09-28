@@ -24,18 +24,18 @@
 <!-- NEXT_SUITE_RESULT names every suite that ran: unit and system for Minitest apps, the spec suite for RSpec -->
 
 - **Baseline on {FROM_FULL}:** {TEST_COUNT} tests, {ASSERTION_COUNT} assertions, {FAILURE_COUNT} failures.
-- **Patterns checked:** {PATTERNS_CHECKED} for this hop; {PATTERNS_FIRED} matched.
+- **Patterns checked:** {PATTERNS_CHECKED} for this hop; {PATTERNS_FIRED} matched (see Detection Patterns below).
 
 {ONE_PARAGRAPH_SUMMARY}
 <!-- Three or four plain sentences: how big this hop is for this app, where the findings come from, what kind of work remains. Written for someone who reads nothing else. -->
 
-**Contents:** What Was Checked (deprecations, gems, boot and tests) · Fix Before Bump · Fix When Ready · Plan · Testing Checklist · Rollback Plan
+**Contents:** What Was Checked (deprecations, detection patterns, gems, boot and tests) · Fix Before Bump · Fix When Ready · Plan · Testing Checklist · Rollback Plan
 
 ---
 
 ## What Was Checked
 
-The three checks below run before any finding is written. Anything they turn up that needs work is an entry in Fix Before Bump; these sections record what was checked and what came back.
+The four checks below run before any finding is written. Anything they turn up that needs work is an entry in Fix Before Bump; these sections record what was checked and what came back.
 
 ### Deprecation Warnings on {FROM}
 
@@ -45,6 +45,21 @@ The warnings the current version emits, collected before any dual-boot work.
 |---------|-------|--------|------|
 {DEPRECATION_INVENTORY_ROWS}
 <!-- Status: fixed (already in the baseline above) / deferred to the bump (setter removed on {TO}; also listed in Fix Before Bump) / deferred to a later hop (about a version after {TO}) / gem-owned (belongs to the gem's own update) -->
+
+---
+
+### Detection Patterns
+
+{PATTERNS_CHECKED} patterns for the {FROM} to {TO} hop were run against the codebase; {PATTERNS_FIRED} matched. Each match is an entry in Fix Before Bump or Fix When Ready below.
+
+| Pattern | Kind | Priority | Sites | Files |
+|---------|------|----------|-------|-------|
+{PATTERN_SCAN_ROWS}
+<!-- One row per pattern that matched, same order as the entries below. When none matched, replace the table with "No pattern matched." -->
+
+- Could not be scanned (no files at their paths in this app): {PATTERNS_NOT_SCANNED}.
+- Every site dropped by the pattern's own exclusion: {PATTERNS_ALL_SUPPRESSED}.
+<!-- Write "none" when a list is empty. For each name listed, say what was done: checked by hand, not applicable, or still open. -->
 
 ---
 

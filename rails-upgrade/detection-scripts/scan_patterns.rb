@@ -12,6 +12,7 @@
 #   ruby <skill>/detection-scripts/scan_patterns.rb --target 7.0
 #   ruby <skill>/detection-scripts/scan_patterns.rb --patterns path/to/rails-70-patterns.yml
 #   ruby <skill>/detection-scripts/scan_patterns.rb --summary   # summary table only
+#   ruby <skill>/detection-scripts/scan_patterns.rb --only VAR1,VAR2   # detail for these patterns only
 #   ruby <skill>/detection-scripts/scan_patterns.rb --format json
 #   ruby <skill>/detection-scripts/scan_patterns.rb --self-test
 #
@@ -398,6 +399,7 @@ def render_markdown(meta, results, opts)
   unless opts[:summary]
     [["Fix before bump", true], ["Fix when ready", false]].each do |label, before|
       group = found.select { |r| FIX_BEFORE_BUMP.include?(r[:kind]) == before }
+      group = group.select { |r| opts[:only].include?(r[:variable]) } if opts[:only]
       next if group.empty?
       out << ""
       out << "## #{label} (#{group.length})"
@@ -449,20 +451,38 @@ def render_markdown(meta, results, opts)
   out.join("\n") + "\n"
 end
 
+def status_of(r)
+  if !r[:hits].empty? then "found"
+  elsif !r[:suppressed].empty? then "suppressed"
+  elsif r[:files_scanned].zero? then "unscanned"
+  else "clean"
+  end
+end
+
 def render_json(meta, results)
+  found = results.select { |r| status_of(r) == "found" }
+  by_kind = {}
+  KINDS.each { |k| by_kind[k] = found.count { |r| r[:kind] == k } }
   JSON.pretty_generate(
     "from" => meta[:from], "to" => meta[:to], "patterns" => meta[:patterns_rel],
     "root" => meta[:root], "modular_roots" => meta[:modular_roots],
+    # What the upgrade report's counts come from, so nobody recounts by hand.
+    "summary" => {
+      "patterns_checked" => results.length,
+      "patterns_fired" => found.length,
+      "sites" => found.inject(0) { |t, r| t + r[:hits].length },
+      "files" => found.flat_map { |r| r[:hits].map(&:first) }.uniq.length,
+      "by_kind" => by_kind,
+      "unscanned" => results.select { |r| status_of(r) == "unscanned" }.map { |r| r[:variable] },
+      "suppressed" => results.select { |r| status_of(r) == "suppressed" }.map { |r| r[:variable] }
+    },
     "findings" => results.map do |r|
       {
         "name" => r[:name], "variable_name" => r[:variable], "kind" => r[:kind],
-        "priority" => r[:priority], "bucket" => r[:bucket], "fix" => r[:fix],
+        "priority" => r[:priority], "bucket" => r[:bucket],
+        "explanation" => r[:explanation], "fix" => r[:fix], "prereqs" => r[:prereqs],
         "files_scanned" => r[:files_scanned],
-        "status" => if !r[:hits].empty? then "found"
-                    elsif !r[:suppressed].empty? then "suppressed"
-                    elsif r[:files_scanned].zero? then "unscanned"
-                    else "clean"
-                    end,
+        "status" => status_of(r),
         "sites" => r[:hits].map { |f, l, t, st| { "file" => f, "line" => l, "start_line" => st || l, "text" => t } },
         "suppressed" => r[:suppressed].map { |f, l, t, st| { "file" => f, "line" => l, "start_line" => st || l, "text" => t } }
       }
@@ -484,7 +504,8 @@ def run_scan(patterns_path, root)
         :name => entry["name"], :variable => entry["variable_name"], :kind => entry["kind"],
         :priority => priority, :bucket => bucket,
         :bucket_label => bucket == "fix_before_bump" ? "Fix before bump" : "Fix when ready",
-        :fix => entry["fix"], :exclude => entry["exclude"], :search_paths => entry["search_paths"],
+        :explanation => entry["explanation"], :fix => entry["fix"], :prereqs => entry["prereqs"],
+        :exclude => entry["exclude"], :search_paths => entry["search_paths"],
         :files_scanned => r[:files_scanned], :hits => r[:hits], :suppressed => r[:suppressed]
       }
     end
@@ -562,7 +583,10 @@ def self_test
   Dir.mktmpdir do |dir|
     available_versions.each do |v|
       begin
-        run_scan(patterns_file_for(v), dir)
+        res, roots = run_scan(patterns_file_for(v), dir)
+        j = JSON.parse(render_json({ :to => v, :modular_roots => roots }, res))
+        ok = j["summary"]["patterns_checked"] == res.length && j["findings"].all? { |x| x.key?("explanation") }
+        failures << "rails-#{v.delete('.')}-patterns.yml: JSON summary or explanation missing" unless ok
       rescue StandardError => e
         failures << "rails-#{v.delete('.')}-patterns.yml raised #{e.class}: #{e.message}"
       end
@@ -589,6 +613,7 @@ if $PROGRAM_NAME == __FILE__
     o.on("--root DIR", "app root (default: .)") { |v| opts[:root] = v }
     o.on("--format FORMAT", %w[markdown json], "markdown (default) or json") { |v| opts[:format] = v }
     o.on("--summary", "print the summary table only, no per-site detail") { opts[:summary] = true }
+    o.on("--only VARS", "per-site detail only for these variable_names (comma-separated)") { |v| opts[:only] = v.split(",").map(&:strip) }
     o.on("--show-suppressed", "list the sites dropped by each entry's exclude:") { opts[:show_suppressed] = true }
     o.on("--self-test", "run built-in assertions and exit") { opts[:self_test] = true }
   end.parse!
