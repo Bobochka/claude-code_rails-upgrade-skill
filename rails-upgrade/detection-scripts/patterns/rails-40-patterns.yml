@@ -437,6 +437,20 @@ upgrade_findings:
       fix: "Replace with config.assets.js_compressor = :uglifier and config.assets.css_compressor = :sass"
       variable_name: "ASSETS_COMPRESS"
 
+    - name: "Hardcoded /assets/ path to a pipeline asset"
+      kind: "breaking"
+      pattern: "[\"'(]\\s*/assets/"
+      exclude: "^\\s*(?://|-#)|^\\s*#\\s|\\[[\\w-]+[\\^$*~|]?=\\s*[\"']/assets/"
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "config/"
+        - "vendor/assets/"
+        - "public/*.html"
+      explanation: "Rails 3.2 wrote every precompiled asset twice. When config.assets.digest is on, the 3.2 `assets:precompile:all` task (actionpack lib/sprockets/assets.rake) runs `assets:precompile:nondigest` after the digest pass, so public/assets/ holds both logo-<digest>.png and a plain logo.png. On 4.0 the precompile task comes from sprockets-rails 2.x, which calls Sprockets::Manifest#compile and writes only the digested file. Every literal `/assets/name.ext` reference then 404s once the 4.0 bundle is deployed with precompiled assets. The app boots, the page renders and the test suite stays green (with config.assets.compile on, the test-environment default, Sprockets serves logical paths live), so the first sign is a missing image or font in production. A literal path that already carries a digest (`/assets/logo-0a1b2c...png`) breaks too: the digest mixes in the Sprockets version, so it changes at the bump even when the file does not. The pattern flags a quote or `(` followed by `/assets/`, so `url(/assets/x.png)`, `\"/assets/x.png\"` and `'/assets/x.png'` all match, while a full URL on another host (`https://cdn.example.com/assets/x.png`) does not. It skips spec/ and test/ on purpose: a request spec that GETs `/assets/...` is served live by Sprockets and still passes on 4.0"
+      fix: "Replace each literal with the asset helper for its file type, all of which work on 3.2 and 4.0, so the change lands before the bump: `image_tag(\"logo.png\")` or `asset_path(\"logo.png\")` in ERB / HAML, `image-url(\"logo.png\")` or `asset-url(...)` in SCSS (a plain .css file must be renamed to .css.scss first, and any `config.assets.precompile` entry naming it updated), and for plain JavaScript render the path from the view with `asset_path` into a data- attribute instead of hardcoding it. Paperclip-style `default_url: \"/assets/missing.png\"` options need `ActionController::Base.helpers.asset_path(\"missing.png\")`. For a URL that something outside the app already holds (a sent email, a partner integration, a static error page in public/), move the file out of app/assets into public/ so the plain path keeps working. Do not set `config.assets.digest = false` to get the plain names back: it drops cache busting for every asset. After precompiling the 4.0 bundle, check that each remaining literal path resolves to a file under public/"
+      variable_name: "NON_DIGEST_ASSET_PATHS"
+
     - name: "config.paths[\"config/routes\"] (without .rb)"
       kind: "breaking"
       pattern: "config\\.paths\\[.config/routes.\\]"

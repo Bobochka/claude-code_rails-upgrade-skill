@@ -218,6 +218,43 @@ ASSETS_COMPRESS:
   no_match:
     - "  config.assets.js_compressor = :uglifier"
 
+NON_DIGEST_ASSET_PATHS:
+  # Pattern: "[\"'(]\\s*/assets/"
+  # A literal /assets/ path opened by a quote or a paren.
+  match:
+    # plain CSS url() without quotes
+    - "  background: url(/assets/icons/arrow.png) no-repeat;"
+    # quoted url() in SCSS
+    - "  background-image: url(\"/assets/backgrounds/stripes.png\");"
+    # string literal in plain JavaScript
+    - "    icon.src = '/assets/spinner.gif';"
+    # HAML attribute hash
+    - "%link{ href: '/assets/favicons/apple-touch-icon.png', rel: 'apple-touch-icon' }"
+    # ERB markup
+    - "<img src=\"/assets/logo.png\" alt=\"Logo\">"
+    # a path that already carries a digest still breaks at the bump
+    - "  background: url(/assets/shared/calendar-5f2b9c0d1e3a4b6c7d8e9f0a1b2c3d4e.svg);"
+    # Paperclip-style default in a model or initializer
+    - "  has_attached_file :avatar, default_url: \"/assets/missing.png\""
+    # the leading paren of a helper call does not make the literal path safe
+    - "  background: url(image_path(\"/assets/backgrounds/grid.png\"));"
+  no_match:
+    # asset helpers resolve the digest themselves
+    - "= image_tag \"logo.png\""
+    - "  background-image: image-url(\"backgrounds/stripes.png\");"
+    # a full URL on another host is not served by this app's pipeline
+    - "  background: url(\"https://cdn.example.com/assets/x.svg\");"
+    # the prefix setting itself carries no trailing slash
+    - "  config.assets.prefix = \"/assets\""
+    # a local path with assets further down is not a pipeline path
+    - "  File.join(Rails.root, \"app/assets/images\")"
+    # commented-out references in Ruby, HAML and JavaScript
+    - "  # icon = \"/assets/old_icon.png\""
+    - "  -# %img{ src: '/assets/old_icon.png' }"
+    - "  // icon.src = '/assets/old_icon.png';"
+    # a CSS attribute selector that tests for the prefix is not a reference
+    - "    expect(wrapper.find('img[src^=\"/assets/\"]')).toHaveLength(0)"
+
 CONFIG_ROUTES_PATH:
   match:
     - "  config.paths[\"config/routes\"].concat %w(lib/custom_routes)"

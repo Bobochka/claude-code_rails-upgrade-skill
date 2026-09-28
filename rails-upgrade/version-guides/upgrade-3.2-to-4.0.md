@@ -749,6 +749,51 @@ Rails 4.0 dropped support for `vendor/plugins`.
 
 ---
 
+#### Precompile No Longer Writes Non-Digest Asset Copies
+
+**What Changed:**
+On Rails 3.2, `rake assets:precompile` ran a second `assets:precompile:nondigest` pass
+whenever `config.assets.digest` was on, so `public/assets/` held both `logo-<digest>.png`
+and a plain `logo.png`. On 4.0 the task comes from `sprockets-rails` 2.x, whose
+`Sprockets::Manifest#compile` writes the digested file only. Any hardcoded
+`/assets/logo.png` stops resolving in production once the 4.0 bundle is precompiled.
+
+Nothing raises. The page renders, and the test suite stays green because Sprockets serves
+logical paths live wherever `config.assets.compile` is on (the test default). The symptom
+is a broken image, icon or font in production. A literal path that already carries a
+digest breaks too: the digest mixes in the Sprockets version, so it changes at the bump.
+
+**Detection Pattern:**
+```bash
+grep -rnE "[\"'(][[:space:]]*/assets/" app/ lib/ config/ vendor/assets/ public/*.html
+```
+
+**Fix:**
+```scss
+// BEFORE (plain .css, or .css.scss)
+.banner { background: url(/assets/backgrounds/stripes.png); }
+
+// AFTER (rename the file to .css.scss first if it is plain .css)
+.banner { background: image-url("backgrounds/stripes.png"); }
+```
+
+```haml
+-# BEFORE
+%link{ href: '/assets/favicons/apple-touch-icon.png', rel: 'apple-touch-icon' }
+
+-# AFTER
+%link{ href: asset_path('favicons/apple-touch-icon.png'), rel: 'apple-touch-icon' }
+```
+
+The helpers exist on 3.2, so the change ships before the bump. In plain JavaScript,
+render the path from the view (`data-icon="<%= asset_path('spinner.gif') %>"`) instead of
+hardcoding it. A file that something outside the app links to directly (a sent email, a
+static error page in `public/`) belongs in `public/`, outside the pipeline. Do not set
+`config.assets.digest = false` to get the plain names back: that drops cache busting for
+every asset.
+
+---
+
 #### Bidirectional `dependent: :destroy` Now Recurses Forever
 
 **What Changed:**
@@ -1147,6 +1192,7 @@ Review changes to:
 - Check partials for `undefined local variable` errors from removed magic variables
 - Check JSON serialization — Rails 4 may add `id: nil` to serialized objects
 - Check error message assertions — SQL quoting changed (parentheses → backticks)
+- Precompile the 4.0 bundle and confirm every literal `/assets/` path still resolves to a file under `public/assets/`
 
 ---
 
@@ -1183,6 +1229,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `NameError: uninitialized constant ActiveSupport::BufferedLogger` | "`ActiveSupport::BufferedLogger` Renamed" — renamed to `ActiveSupport::Logger` |
 | `ActiveRecord::ImmutableRelation` | "`ActiveRecord::ImmutableRelation` Error" — use `.distinct.count` |
 | Controller specs don't see custom headers | "Test Request Headers API Changed" — use `request.headers.merge!` |
+| Images, icons or fonts 404 in production, fine in tests | "Precompile No Longer Writes Non-Digest Asset Copies": replace literal `/assets/` paths with asset helpers |
 
 ---
 
