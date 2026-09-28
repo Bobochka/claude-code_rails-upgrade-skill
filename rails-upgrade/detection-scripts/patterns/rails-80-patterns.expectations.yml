@@ -1,0 +1,63 @@
+# Fixture expectations for rails-80-patterns.yml.
+#
+# Keyed by variable_name (matching the entries in rails-80-patterns.yml). For
+# each pattern you cover, list:
+#   match     - lines the pattern MUST flag
+#   no_match  - lines it MUST NOT flag (safe code + known false-positive traps)
+#
+# A line is "flagged" when the entry's `pattern` regex matches it AND the
+# entry's `exclude` regex (when present) does not: a per-line grep + grep -v.
+#
+# Run with:
+#   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-80-patterns.yml
+#
+# The patterns without an entry here predate the expectations tooling. Add
+# entries as they are revisited.
+
+TO_TIME_PRESERVES_TIMEZONE:
+  match:
+    # load_defaults 5.0 to 7.2 leaves the value at :offset, so 8.0 warns
+    - "    config.load_defaults 7.2"
+    - "    config.load_defaults 7.1"
+    - "    config.load_defaults 6.0"
+    - "    config.load_defaults 5.2"
+    # quoted and parenthesized forms
+    - "    config.load_defaults \"7.2\""
+    - "    config.load_defaults '6.1'"
+    - "    config.load_defaults(7.0)"
+  no_match:
+    # load_defaults 8.0 sets :zone, 8.0 does not warn
+    - "    config.load_defaults 8.0"
+    - "    config.load_defaults 8.1"
+    - "    config.load_defaults \"8.0\""
+    # generated template interpolates the running version
+    - "    config.load_defaults Rails::VERSION::STRING.to_f"
+    # commented-out line
+    - "    # config.load_defaults 7.2"
+
+TO_TIME_PRESERVES_TIMEZONE_ASSIGNMENT:
+  match:
+    # Rails 4.2 generated initializer, still warns on 8.0
+    - "ActiveSupport.to_time_preserves_timezone = true"
+    - "    config.active_support.to_time_preserves_timezone = :offset"
+    - "    config.active_support.to_time_preserves_timezone = false"
+    - "Rails.application.config.active_support.to_time_preserves_timezone = nil"
+  no_match:
+    # the opt-in itself does not warn on 8.0
+    - "    config.active_support.to_time_preserves_timezone = :zone"
+    - "Rails.application.config.active_support.to_time_preserves_timezone = :zone"
+    # commented-out line in new_framework_defaults_8_0.rb
+    - "# Rails.application.config.active_support.to_time_preserves_timezone = :offset"
+    # reading the value
+    - "    if ActiveSupport.to_time_preserves_timezone"
+
+READ_ENCRYPTED_SECRETS:
+  match:
+    - "  config.read_encrypted_secrets = true"
+    - "  config.read_encrypted_secrets = false"
+    - "Rails.application.config.read_encrypted_secrets = true"
+  no_match:
+    - "  config.require_master_key = true"
+    - "  config.secret_key_base = ENV[\"SECRET_KEY_BASE\"]"
+    # commented-out line
+    - "  # config.read_encrypted_secrets = true"
