@@ -37,3 +37,26 @@ DEPRECATED_FINDERS_AUTOREQUIRE:
     - "gem 'activerecord-deprecated_finders', :require => 'active_record/deprecated_finders'"
     - "# gem 'activerecord-deprecated_finders'"
     - "gem 'activerecord'"
+
+UPDATE_ALL_WITH_CONDITIONS:
+  # The multi-line shape (`update_all({\n a: 1\n}, {\n id: ids\n})`) is reached
+  # by the scanner, which matches file content; fixtures are single lines.
+  match:
+    - "Item.update_all({ price: 0 }, { color: \"red\" })"
+    - "Item.update_all(\"price = 0\", [\"color = ?\", color])"
+    - "Item.update_all('price = 0', 'color = \"red\"')"
+    - "Item.update_all([\"price = ?\", price], id: ids)"
+    - "Item.update_all(updates, id: ids)"
+    - "  scope.update_all(attributes, key_column => key)"
+    - "Item.update_all(self.class.reset_values, { id: ids }, limit: 10)"
+    - "Item.update_all({ price: 0 }, nil, order: :id, limit: 5)"
+  no_match:
+    - "Item.where(color: \"red\").update_all(price: 0)"
+    - "Item.update_all(price: 0, color: \"blue\")"
+    - "Item.update_all(:price => 0, :color => \"blue\")"
+    - "Item.update_all(\"price = 0, color = 'blue'\")"
+    - "Item.update_all([\"price = ?, color = ?\", 0, \"blue\"])"
+    - "Item.update_all(tags: [\"a\", \"b\"].to_yaml)"
+    - "Item.update_all(updates.join(\",\"))"
+    - "Item.update_all(price:0, color: \"blue\")"
+    - "Item.where(id: ids).update_all(updates)"

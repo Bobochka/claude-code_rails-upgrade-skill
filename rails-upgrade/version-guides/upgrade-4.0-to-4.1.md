@@ -211,6 +211,40 @@ Delete the gem outright once the current Rails is 4.1.
 
 ---
 
+#### `update_all` With a Conditions Argument Removed
+
+**What Changed:**
+Rails 4.0 core defines `Relation#update_all(updates)` with a single argument. The `update_all(updates, conditions)` and `update_all(updates, conditions, limit: n, order: x)` forms kept working on 4.0 only because `activerecord-deprecated_finders` wraps `update_all` and warns `Relation#update_all with conditions is deprecated`. Rails 4.1 drops that dependency, so the call raises:
+
+```
+ArgumentError: wrong number of arguments (2 for 1)
+```
+
+**Detection Pattern:**
+```ruby
+Item.update_all({ price: 0 }, { color: "red" })
+Item.update_all("price = 0", ["color = ?", color])
+Item.update_all(updates, id: ids)
+Item.update_all({ price: 0 }, nil, order: :id, limit: 5)
+```
+
+**Fix:**
+```ruby
+# BEFORE
+Item.update_all({ price: 0 }, { color: "red" })
+Item.update_all("price = 0", ["color = ?", color])
+Item.update_all({ price: 0 }, nil, order: :id, limit: 5)
+
+# AFTER
+Item.where(color: "red").update_all(price: 0)
+Item.where("color = ?", color).update_all("price = 0")
+Item.order(:id).limit(5).update_all(price: 0)
+```
+
+The chained form works on 3.2, 4.0 and 4.1, so it can ship before the bump. Calls split across several lines are the ones a hand review tends to miss; the detection pattern reaches them.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### MultiJSON Removed from Rails
@@ -676,6 +710,7 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 12. Pin JSON time precision if clients need it (`time_precision = 0`).
 13. Remove MultiJSON usage or add it back to the `Gemfile` explicitly.
 14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
+15. Move `update_all(updates, conditions)` conditions into a `where` chain.
 
 ### Phase 6: Testing
 - Run full test suite.
@@ -696,6 +731,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `NameError: uninitialized constant MultiJSON` | "MultiJSON Removed from Rails" — add `gem 'multi_json'` or move to `to_json` / `JSON.parse` |
 | `NoMethodError: undefined method 'find_all_by_email'` | "Dynamic Finders Removed" — rewrite as `where(email: email)`, or `activerecord-deprecated_finders` temporarily |
 | `NoMethodError` on `find_all_by_*` (or another bridged call) with `activerecord-deprecated_finders` in the Gemfile | "Dynamic Finders Removed": add `require: 'active_record/deprecated_finders'` to the gem line |
+| `ArgumentError: wrong number of arguments (2 for 1)` from `update_all` | "`update_all` With a Conditions Argument Removed": move the conditions into `where(...)` |
 | Query returns zero rows after upgrade | "`default_scope` Chains with Other Scopes" — use `unscope(where: :col)` or `rewhere` |
 | `ActionController::InvalidAuthenticityToken` in controller tests on JS endpoints | "CSRF Protection Now Covers GET with JS Responses" — use `xhr :verb, :action` |
 | `flash.to_hash.except(:notice)` silently keeps `:notice` | "Flash Message Keys Are Strings" — use `"notice"` |

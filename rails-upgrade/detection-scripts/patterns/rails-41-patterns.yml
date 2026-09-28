@@ -93,6 +93,19 @@ upgrade_findings:
       fix: "If the call sites are not migrated yet, name the entry file: `gem 'activerecord-deprecated_finders', require: 'active_record/deprecated_finders'`. It is harmless on 4.0, which loads the gem anyway, so the same line works on both sides of a dual boot. Better, once the call sites are migrated, remove the gem. `find_by_*` and `find_by_*!` are still in Rails 4.1 core and do not need it"
       variable_name: "DEPRECATED_FINDERS_AUTOREQUIRE"
 
+    - name: "update_all with a conditions (or options) argument"
+      kind: breaking
+      pattern: "update_all\\(\\s*(\\{[^{}]*\\}|\"[^\"]*\"|'[^']*'|\\[[^\\]]*\\]|@{0,2}[\\w.]+(::[\\w.]+)*!?\\??(\\([^()]*\\))?)\\s*,"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "spec/"
+        - "test/"
+      explanation: "Rails 4.0 core already defines `Relation#update_all(updates)` with one argument. The two- and three-argument forms, `update_all(updates, conditions)` and `update_all(updates, conditions, limit: n, order: x)`, only kept working on 4.0 because activerecord-deprecated_finders, a 4.0 dependency, wraps update_all and warns `Relation#update_all with conditions is deprecated`. Rails 4.1 drops that dependency, so the call raises `ArgumentError: wrong number of arguments (2 for 1)`. The pattern flags an update_all whose first argument (a hash literal, a string, an array, or a variable or method call) is followed by a comma, so the single-argument form, including a keyword hash like `update_all(a: 1, b: 2)`, is not flagged. It reaches calls split across lines. Misses: a first argument that is a hash with a nested hash literal, or a method call with nested parentheses"
+      fix: "Move the conditions into a where chain: `Model.update_all(updates, conditions)` becomes `Model.where(conditions).update_all(updates)`; `update_all(updates, conditions, limit: 10, order: :id)` becomes `where(conditions).order(:id).limit(10).update_all(updates)`. Keep the condition's shape as written (hash, string, or array). The chained form works on Rails 3.2, 4.0 and 4.1, so the rewrite can ship before the bump. Loading activerecord-deprecated_finders on 4.1 restores the old form with a warning, but only with an explicit `require: \"active_record/deprecated_finders\"` in the Gemfile"
+      variable_name: "UPDATE_ALL_WITH_CONDITIONS"
+
   medium_priority:
     - name: "MultiJSON usage"
       kind: breaking
