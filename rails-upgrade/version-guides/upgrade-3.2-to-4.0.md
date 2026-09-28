@@ -931,9 +931,9 @@ itself is not affected, because sass-rails only fills in an unset value.
 
 **Detection Pattern:**
 ```bash
-# .css files of three lines or fewer with a 300+ character line
-find app/assets/stylesheets lib/assets/stylesheets vendor/assets/stylesheets -name "*.css" \
-  -exec awk 'END { if (NR <= 3 && max >= 300) print FILENAME } { if (length($0) > max) max = length($0) }' {} \;
+# .css files with at most two newlines (the same count as the 3.2 guard)
+# and a line of 300+ characters
+ruby -e 'Dir["{app,lib,vendor}/assets/stylesheets/**/*.css"].each { |f| css = File.read(f); puts f if css.count("\n") <= 2 && css.lines.any? { |l| l.chomp.length >= 300 } }'
 ```
 
 **Fix:**
