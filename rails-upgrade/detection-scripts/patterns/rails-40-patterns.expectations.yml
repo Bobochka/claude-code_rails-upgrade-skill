@@ -71,6 +71,10 @@ CLASS_SCOPED:
     - "      scoped"
     - "    else      scoped"
     - "  subject { described_class.scoped }"
+    # receiverless scoped passed as an argument
+    - "    where(active: true).merge(scoped)"
+    - "    (scoped)"
+    - "    wrap(scoped, options)"
   no_match:
     - "  Model.unscoped.where(active: true)"
     - "  Model.default_scoped"
@@ -92,6 +96,7 @@ CLASS_SCOPED:
     - "    \"make sure the query is properly scoped.\""
     # a local variable or let named scoped
     - "    scoped = if ids.any?"
+    - "    scoped ||= where(nil)"
     - "    scoped&.map(&:name)"
     - "    allow(report).to receive(:rows).and_return(scoped)"
     - "  let(:scoped) { Widget.where(nil) }"

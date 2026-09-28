@@ -1300,6 +1300,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `ArgumentError: The method .order() must contain arguments.` | "`order` and `reorder` Require Arguments" — name the column, `order(:id)` for `.order.last` |
 | `ArgumentError: Direction should be :asc or :desc` | "`order` and `reorder` Require Arguments" — hash values must be `:asc` / `:desc`; use strings across joins |
 | `DEPRECATION WARNING: This dynamic method is deprecated. Please use e.g. Post.where(...).all instead.` (the suggestion is `Post.where(...).last`, `Post.find_or_create_by(name: 'foo')` or `Post.find_or_initialize_by(name: 'foo')` for the other finders) | "Dynamic Finders Deprecated": rewrite with `where`, raises on 4.1 |
+| `DEPRECATION WARNING: Model.scoped is deprecated. Please use Model.all instead.` | "`Model.scoped` Deprecated": use `where(nil)` before the bump, `all` after |
 | `NoMethodError: undefined method 'rescue_action'` | "`rescue_action` Removed — Use `rescue_from`" |
 | `undefined local variable or method` in partial | "Partial Magic Variables Removed" — pass `locals:` |
 | Cache misses after upgrade | "`cache_key` Timestamp Format Changed" — changed to `:nsec` |
