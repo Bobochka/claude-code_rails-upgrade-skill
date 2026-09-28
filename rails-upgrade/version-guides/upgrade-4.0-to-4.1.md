@@ -286,6 +286,40 @@ The lambda form works on 4.0 and 4.1, so the rewrite can land before the version
 
 ---
 
+#### Association `:uniq` Option Removed
+
+**What Changed:**
+Rails 4.1 no longer depends on `activerecord-deprecated_finders`, the gem that kept `:uniq` working (with a deprecation warning) on 4.0. Without it, `has_many` rejects the key when the model class loads:
+
+```
+ArgumentError: Unknown key: :uniq. Valid keys are: :class_name, :anonymous_class, :foreign_key, ...
+```
+
+The app fails to boot or eager load, and every test that touches the model fails.
+
+`has_and_belongs_to_many` fails silently instead. 4.1 rebuilds it as a `has_many :through` and passes on only a fixed list of options (`:before_add`, `:after_add`, `:before_remove`, `:after_remove`, `:autosave`, `:validate`, `:join_table`). `:uniq` is dropped with no error and no warning, the query loses its `DISTINCT`, and duplicate join rows come back as duplicate records. The bridge gem does not change this.
+
+**Detection Pattern:**
+```ruby
+has_many :tags, through: :taggings, uniq: true
+has_and_belongs_to_many :roles, :uniq => true
+```
+
+**Fix:**
+```ruby
+# BEFORE
+has_many :tags, through: :taggings, uniq: true
+has_and_belongs_to_many :roles, :uniq => true
+
+# AFTER
+has_many :tags, -> { distinct }, through: :taggings
+has_and_belongs_to_many :roles, -> { distinct }
+```
+
+`distinct` exists on 4.0 (`uniq` is its alias there), so the rewrite can land before the version bump. As a short-term bridge, `gem 'activerecord-deprecated_finders'` restores `:uniq` on `has_many`. It does not fix `has_and_belongs_to_many`.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### MultiJSON Removed from Rails
@@ -753,6 +787,7 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
 15. Move association `:conditions` into scope lambdas, including every `has_and_belongs_to_many` (4.1 drops the option there without an error).
 15. Move association `:order` into scope lambdas, including every `has_one` and `has_and_belongs_to_many` (4.1 ignores the option there without an error).
+15. Replace association `uniq: true` with `-> { distinct }`, including every `has_and_belongs_to_many` (4.1 drops the option there without an error).
 
 ### Phase 6: Testing
 - Run full test suite.
@@ -783,6 +818,8 @@ Error → section lookup for the most common errors encountered during this upgr
 | `has_and_belongs_to_many` returns rows its `:conditions` used to filter out | "Association `:conditions` Option Removed": habtm drops the option silently at 4.1, use a scope lambda |
 | `ArgumentError: Unknown key: :order` when a model loads | "Association `:order` Option Removed": move the order into a scope lambda |
 | `has_one` or `has_and_belongs_to_many` returns rows in a different order | "Association `:order` Option Removed": 4.1 ignores `:order` there without an error, use a scope lambda |
+| `ArgumentError: Unknown key: :uniq` when a model loads | "Association `:uniq` Option Removed": use `-> { distinct }` |
+| `has_and_belongs_to_many` returns duplicate records | "Association `:uniq` Option Removed": 4.1 drops `:uniq` there without an error, use `-> { distinct }` |
 
 ---
 

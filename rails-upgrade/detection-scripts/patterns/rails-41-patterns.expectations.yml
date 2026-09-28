@@ -52,3 +52,12 @@ ASSOCIATION_ORDER:
     # an association named order is not the option
     - "  belongs_to :order, touch: true"
     - "  has_many :orders, dependent: :destroy"
+
+ASSOCIATION_UNIQ:
+  match:
+    - "  has_many :tags, through: :taggings, uniq: true"
+    - "  has_and_belongs_to_many :roles, :uniq => true"
+  no_match:
+    - "  has_many :tags, -> { distinct }, through: :taggings"
+    - "  has_many :tags, -> { uniq }, through: :taggings"
+    - "  has_many :unique_visits, dependent: :destroy"
