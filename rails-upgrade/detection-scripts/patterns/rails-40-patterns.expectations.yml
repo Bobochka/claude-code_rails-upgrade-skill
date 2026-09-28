@@ -135,8 +135,16 @@ FIND_ALL_BY:
 FIND_OR_CREATE_BY:
   match:
     - "User.find_or_create_by_email(email)"
+    - "    tag = post.tags.find_or_create_by_name_and_kind(name, \"topic\")"
+    - "    Role.find_or_create_by_name!(\"admin\")"
+    # factory hook in a spec support file
+    - "  initialize_with { Category.find_or_create_by_name(name) }"
   no_match:
     - "User.find_or_create_by(email: email)"
+    - "User.where(email: email).first_or_create"
+    # an app-defined method, not the Rails matcher
+    - "    def find_or_create_by_owner(owner)"
+    - "    expect(Tag).to receive(:find_or_create_by_name).with(\"x\")"
 
 FIND_OR_INITIALIZE_BY:
   match:
