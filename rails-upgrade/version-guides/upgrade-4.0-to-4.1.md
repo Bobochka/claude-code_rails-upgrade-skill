@@ -240,6 +240,39 @@ The lambda form works on Rails 4.0 too, so this can land before the version bump
 
 ---
 
+#### `default_scope` Without a Block Raises
+
+**What Changed:**
+Rails 4.0 accepted `default_scope` with a relation or a hash argument and a deprecation warning. Rails 4.1 raises while the class body runs, so the model fails to load:
+
+```
+ArgumentError: Support for calling #default_scope without a block is removed.
+```
+
+`activerecord-deprecated_finders` keeps the hash form (`default_scope order: 'name'`) working with a warning. It does not rescue a relation argument. Overriding `def self.default_scope` as a class method is not affected.
+
+**Detection Pattern:**
+```ruby
+default_scope where(deleted_at: nil)
+default_scope order('created_at DESC')
+default_scope :order => 'name'
+```
+
+**Fix:**
+```ruby
+# BEFORE
+default_scope where(deleted_at: nil)
+default_scope :order => 'name'
+
+# AFTER
+default_scope { where(deleted_at: nil) }
+default_scope { order(:name) }
+```
+
+The block form works on Rails 4.0 too, so this can land before the version bump without a `NextRails.next?` branch.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### MultiJSON Removed from Rails
@@ -706,6 +739,7 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 13. Remove MultiJSON usage or add it back to the `Gemfile` explicitly.
 14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
 15. Wrap every non-callable `scope` body in a lambda (`scope :active, -> { where(active: true) }`).
+15. Pass a block to every `default_scope` that takes a relation or a hash (`default_scope { where(deleted_at: nil) }`).
 
 ### Phase 6: Testing
 - Run full test suite.
@@ -733,6 +767,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `TypeError: CacheDigests is not a class` from every `rake` task | "`cache_digests` Gem Collides with Core Cache Digests" — `gem 'cache_digests' unless NextRails.next?`, move `CacheDigests::*` calls to `ActionView::Digestor` |
 | API clients fail to parse `2024-01-01T00:00:00.000Z` | "`as_json` Millisecond Precision for Time/DateTime/TWZ" — `ActiveSupport::JSON::Encoding.time_precision = 0` or update consumers |
 | `NoMethodError: undefined method 'call'` when a scope runs | "Scopes With a Non-Callable Body Removed": wrap the body in `-> { ... }` |
+| `ArgumentError: Support for calling #default_scope without a block is removed` when a model loads | "`default_scope` Without a Block Raises": wrap the argument in a block |
 
 ---
 
