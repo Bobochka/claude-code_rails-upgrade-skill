@@ -487,7 +487,7 @@ names = User.active.to_a.sort_by!(&:name)
 
 Use `to_a`, not the `load` the deprecation message also suggests: `load` returns the `Relation`, so it changes the return type. Dropping `.all` entirely is fine where the caller only iterates, but keep `to_a` when the result is appended to with `<<`: on a `has_many` association of a saved record, `<<` saves the new record instead of adding to a local list.
 
-The pattern flags every `.all` called without arguments. Most hits are `Model.all`. Capybara's `page.all(...)` is skipped, but objects with their own `all` method still match. Check the receiver before rewriting. `gem 'activerecord-deprecated_finders'` restores the 4.0 behavior on 4.1 as a short-term bridge.
+The pattern flags every `.all` not followed directly by `(`. Most hits are `Model.all`. Capybara's `page.all(".row")` is skipped, but `page.all ".row"` without parentheses matches, and so does `.all (...)` with a space before the parenthesis. Objects with their own `all` method also match. Check the receiver before rewriting. `gem 'activerecord-deprecated_finders'` restores the 4.0 behavior on 4.1 as a short-term bridge.
 
 ---
 

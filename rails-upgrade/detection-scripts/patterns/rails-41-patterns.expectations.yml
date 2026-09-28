@@ -35,6 +35,8 @@ RELATION_ALL:
     - "    users = User.active.all"
     - "    records = scope.order(:created_at).all.sort_by!(&:id)"
     - "    Post.all"
+    # Capybara without parentheses: only .all( right after the name is skipped.
+    - "    rows = page.all \".row\""
   no_match:
     # Finder options: a separate change, and not the zero-argument call.
     - "    Post.where(published: true).all(limit: 5)"
