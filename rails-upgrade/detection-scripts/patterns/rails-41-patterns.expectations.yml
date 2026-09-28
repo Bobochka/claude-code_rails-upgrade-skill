@@ -62,3 +62,17 @@ COUNT_MULTI_COLUMN_SELECT:
     - "    items.select { |item| item.valid? }"
     # The lookbehind keeps the bare in-scope form while skipping longer names.
     - "    multiselect(\"title, version\")"
+
+JOIN_DEPENDENCY_INTERNALS:
+  match:
+    - "    where(\"#{join.aliased_table_name}.account_id = #{join.parent_table_name}.account_id\")"
+    - "  ActiveRecord::Associations::JoinDependency::JoinAssociation.send(:prepend, SoftDeleteJoin)"
+    - "      def join_to(manager)"
+  no_match:
+    # Commented-out code is excluded.
+    - "  # def join_to(manager) moved to join_constraints in 4.1"
+    # The 4.1 method name and the alias that survived are fine.
+    - "      def join_constraints(foreign_table, foreign_klass, node, join_type, tables, scope_chain, chain)"
+    - "    where(\"#{join.aliased_table_name}.deleted_at IS NULL\")"
+    - "  def join_token"
+    - "    self.parent_table_names = []"
