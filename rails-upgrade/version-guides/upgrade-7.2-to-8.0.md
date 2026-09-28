@@ -330,6 +330,90 @@ Rails 8.0 includes Kamal configuration for deployment.
 
 ---
 
+#### to_time Preserves the Full Timezone
+
+**What Changed:**
+Rails 8.0 warns whenever `to_time_preserves_timezone` is set to anything other than `:zone`, because 8.1 makes `:zone` the only behavior. `load_defaults 8.0` sets `:zone`. `load_defaults` 5.0 to 7.2 leave it at `:offset` on 8.0 (7.2 stores the same setting as `true`), so an app still on an older `load_defaults` warns at boot:
+
+```
+DEPRECATION WARNING: `to_time` will always preserve the full timezone rather than offset of the receiver in Rails 8.1.
+To opt in to the new behavior, set `config.active_support.to_time_preserves_timezone = :zone`.
+```
+
+An app with no `load_defaults` line gets `false` and a different message (`... preserve the receiver timezone rather than system local time in Rails 8.1`).
+
+An explicit assignment keeps warning even after `load_defaults 8.0`, because the setter itself warns. The usual source is the forward-compat initializer the Rails 4.2 generator added, `config/initializers/to_time_preserves_timezone.rb`.
+
+**Detection Pattern:**
+```ruby
+# config/application.rb
+config.load_defaults 7.2
+
+# config/initializers/to_time_preserves_timezone.rb (or any file under config/)
+ActiveSupport.to_time_preserves_timezone = true
+config.active_support.to_time_preserves_timezone = :offset
+```
+
+**Fix:**
+```ruby
+# BEFORE
+# config/initializers/to_time_preserves_timezone.rb
+ActiveSupport.to_time_preserves_timezone = true
+
+# AFTER
+# Delete the file. load_defaults 5.0+ already sets this on 7.2, and on 8.0
+# the after_initialize hook overwrites a direct assignment with the config value.
+```
+
+```ruby
+# BEFORE (warns on 8.0)
+# config/application.rb
+config.load_defaults 7.2
+
+# AFTER (opts in to this one setting; 7.2 accepts :zone, so no NextRails.next? branch)
+config.load_defaults 7.2
+config.active_support.to_time_preserves_timezone = :zone
+```
+
+This flag is the default fix because it targets this one deprecation. Aligning `load_defaults` to 8.0 also removes the warning, but it flips every other 8.0 default at the same time, so treat it as the follow-up in Workflow 12, which moves `load_defaults` one setting at a time after the upgrade ships. Once `load_defaults 8.0` is in place, the explicit line is redundant: delete it then, because 8.1 deprecates the setting itself.
+
+On 8.0 `:zone` is a behavior change: `to_time` returns a Time that carries the receiver's full zone (DST-aware) instead of a fixed UTC offset. Run the suite after adding the line.
+
+---
+
+### 🟢 LOW PRIORITY
+
+#### read_encrypted_secrets Removed
+
+**What Changed:**
+Rails 8.0 removes `config.read_encrypted_secrets`. The setting drove the legacy `config/secrets.yml.enc` feature, already dead since 7.2 removed `Rails.application.secrets`. The assignment does not raise on 8.0: it is stored with no effect and no warning. Only the 7.2 side of a dual boot warns, which clutters boot and `assets:precompile` logs:
+
+```
+DEPRECATION WARNING: 'config.read_encrypted_secrets=' is deprecated and will be removed in Rails 8.0.
+```
+
+Reading `config.read_encrypted_secrets` without assigning it first raises `NoMethodError` on 8.0.
+
+**Detection Pattern:**
+```ruby
+# config/environments/production.rb
+config.read_encrypted_secrets = true
+```
+
+**Fix:**
+```ruby
+# BEFORE
+# Attempt to read encrypted secrets from `config/secrets.yml.enc`.
+config.read_encrypted_secrets = true
+
+# AFTER
+# (line and comment deleted; safe on both 7.2 and 8.0)
+```
+
+If the app still keeps secrets in `config/secrets.yml.enc`, move them to credentials (`bin/rails credentials:edit`) first.
+
+---
+
 ## Solid Gems Decision Guide
 
 | Current Setup | Recommendation |
@@ -431,6 +515,8 @@ Error → section lookup for the most common errors encountered during this upgr
 | 404 for CSS / JS files | "Sprockets → Propshaft" — Propshaft needs no config, files go in `app/assets/`; Sprockets needs `gem 'sprockets-rails'` |
 | `ERR_TOO_MANY_REDIRECTS` | "assume_ssl Configuration" — `config.assume_ssl = true` behind a proxy |
 | Solid Queue jobs stuck in pending | "Solid Queue (Optional)" — start the supervisor, `bin/jobs` |
+| `` DEPRECATION WARNING: `to_time` will always preserve the full timezone `` (or `receiver timezone`) at boot | "to_time Preserves the Full Timezone": set `to_time_preserves_timezone = :zone`; `load_defaults 8.0` later |
+| `DEPRECATION WARNING: 'config.read_encrypted_secrets=' is deprecated` on the 7.2 side | "read_encrypted_secrets Removed": delete the line |
 
 ---
 

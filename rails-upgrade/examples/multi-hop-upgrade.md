@@ -61,13 +61,11 @@ Hop 1: Rails 5.2 → 6.0 (Hard — ~1–2 weeks)
 
 Breaking Changes Found in Your Code
 
-┌──────────┬───────────────────────────────────┬──────┬───────────────────────────────────────────────────────┬─────────────────────────┐
-│ Priority │               File                │ Line │                         Issue                         │           Fix           │
-├──────────┼───────────────────────────────────┼──────┼───────────────────────────────────────────────────────┼─────────────────────────┤
-│ 🔴 HIGH  │ config/environments/production.rb │ 20   │ config.read_encrypted_secrets = true — removed in 6.0 │ Delete this line        │
-├──────────┼───────────────────────────────────┼──────┼───────────────────────────────────────────────────────┼─────────────────────────┤
-│ 🟡 MED   │ config/application.rb             │ 22   │ config.load_defaults 5.1                              │ Update to 5.2, then 6.0 │
-└──────────┴───────────────────────────────────┴──────┴───────────────────────────────────────────────────────┴─────────────────────────┘
+┌──────────┬───────────────────────┬──────┬──────────────────────────┬─────────────────────────┐
+│ Priority │         File          │ Line │          Issue           │           Fix           │
+├──────────┼───────────────────────┼──────┼──────────────────────────┼─────────────────────────┤
+│ 🟡 MED   │ config/application.rb │ 22   │ config.load_defaults 5.1 │ Update to 5.2, then 6.0 │
+└──────────┴───────────────────────┴──────┴──────────────────────────┴─────────────────────────┘
 
 Zeitwerk Check (⚠️  Most Critical)
 
@@ -92,9 +90,8 @@ Gem Updates Required
 Migration Steps
 
 git checkout -b rails-60-upgrade
-# 1. Remove config.read_encrypted_secrets from production.rb
-# 2. Update Gemfile: gem 'rails', '~> 6.0.0'
-# 3. Update gem constraints above
+# 1. Update Gemfile: gem 'rails', '~> 6.0.0'
+# 2. Update gem constraints above
 bundle update rails
 bundle exec rails app:update
 bundle exec rails zeitwerk:check
@@ -278,6 +275,7 @@ bundle update rails
 bundle exec rails app:update
 # Update config.load_defaults to 8.0
 # Add config.assume_ssl = true to production.rb
+# Delete config.read_encrypted_secrets from production.rb (removed in 8.0, the 7.2 side warns)
 bundle exec rspec
 # Test asset serving manually
 
