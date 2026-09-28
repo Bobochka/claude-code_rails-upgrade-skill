@@ -130,6 +130,26 @@ upgrade_findings:
       fix: "Use the schema_cache_path / cache_dump_filename API directly, or rely on the new ActiveRecord::Base.schema_cache_ignored_tables / connection_pool.schema_reflection knobs depending on the use case"
       variable_name: "ENV_SCHEMA_CACHE"
 
+    - name: "to_time_preserves_timezone default (load_defaults below 8.0)"
+      kind: "deprecation"
+      pattern: "load_defaults[\\s(]+[\"']?[5-7]\\.\\d+\\b"
+      exclude: "^\\s*#"
+      search_paths:
+        - "config/application.rb"
+      explanation: "Rails 8.0 warns at boot, from an after_initialize hook, whenever `config.active_support.to_time_preserves_timezone` is anything other than `:zone`. `load_defaults 8.0` sets `:zone`, so the warning fires only for apps still on `load_defaults` 5.0 to 7.2 (value `:offset`: `DEPRECATION WARNING: to_time will always preserve the full timezone rather than offset of the receiver in Rails 8.1`). An app with no `load_defaults` line at all gets `false` and a different message (`... preserve the receiver timezone rather than system local time in Rails 8.1`); this line-based pattern cannot see a missing line, so check for that case by hand. The opt-in itself is absent when the warning fires, so the `load_defaults` value is the proxy signal. False positive: an app on `load_defaults` 7.2 that already sets `:zone` (in application.rb or an uncommented config/initializers/new_framework_defaults_8_0.rb) is still flagged"
+      fix: "Default fix: set the flag for this one deprecation, `config.active_support.to_time_preserves_timezone = :zone`, after `load_defaults` in config/application.rb. Aligning `load_defaults` to 8.0 also removes the warning, but it flips every other 8.0 default at the same time, so treat it as the follow-up in Workflow 12 (rails-load-defaults skill), which moves `load_defaults` one setting at a time after the upgrade ships. 7.2 accepts `:zone` and treats it like `true`, so set it unconditionally, no NextRails.next? branch needed. On 8.0 it is a behavior change: `to_time` returns a Time carrying the receiver's full zone (DST-aware) instead of a fixed UTC offset, so run the suite after adding the line. If the app also assigns the value directly elsewhere, that line keeps warning (see TO_TIME_PRESERVES_TIMEZONE_ASSIGNMENT). Delete the explicit line once `load_defaults 8.0` is in place: 8.1 deprecates the setting itself (see rails-81-patterns.yml TO_TIME_PRESERVES_TIMEZONE_CONFIG)"
+      variable_name: "TO_TIME_PRESERVES_TIMEZONE"
+
+    - name: "to_time_preserves_timezone assigned a value other than :zone"
+      kind: "deprecation"
+      pattern: "to_time_preserves_timezone\\s*=\\s*(?:true|false|nil|:offset)\\b"
+      exclude: "^\\s*#"
+      search_paths:
+        - "config/"
+      explanation: "Rails 8.0's `ActiveSupport.to_time_preserves_timezone=` warns for any value other than `:zone`: `false` / `nil` get `to_time will always preserve the receiver timezone rather than system local time in Rails 8.1`, `true` / `:offset` get `... preserve the full timezone rather than offset of the receiver in Rails 8.1`. An explicit assignment therefore keeps warning after `load_defaults 8.0`. The usual source is `config/initializers/to_time_preserves_timezone.rb` (`ActiveSupport.to_time_preserves_timezone = true`), which the Rails 4.2 generator added as a forward-compat shim and many apps still carry. An explicit `config.active_support.to_time_preserves_timezone = :offset` or `false` also warns"
+      fix: "Delete the direct `ActiveSupport.to_time_preserves_timezone = true` assignment (and the initializer file if that is all it holds). `load_defaults` 5.0 and later already set `true` on 7.2, and on 8.0 the after_initialize hook overwrites the direct assignment with the config value anyway, so removing it changes nothing on either side of the dual boot. For a `config.active_support.to_time_preserves_timezone = :offset` / `false` line, switch it to `:zone` or delete it once `load_defaults 8.0` is in place; `:zone` changes what `to_time` returns, so run the suite after the change"
+      variable_name: "TO_TIME_PRESERVES_TIMEZONE_ASSIGNMENT"
+
     - name: "Routes drawn with multiple paths"
       kind: "deprecation"
       pattern: "^\\s*(get|post|put|patch|delete|match)\\s+\\["
@@ -173,6 +193,16 @@ upgrade_findings:
       explanation: "javascript_include_tag is the Sprockets-era helper. It keeps working at 8.0 on the Sprockets pipeline. Import Maps / javascript_importmap_tags is the new-app default but is not required for the version bump"
       fix: "No action required for the version bump. If migrating to Import Maps later, replace javascript_include_tag with javascript_importmap_tags and move JS bundling to importmap.rb"
       variable_name: "JS_INCLUDE"
+
+    - name: "read_encrypted_secrets config"
+      kind: "breaking"
+      pattern: "read_encrypted_secrets"
+      exclude: "^\\s*#"
+      search_paths:
+        - "config/"
+      explanation: "Rails 8.0 removes config.read_encrypted_secrets. railties/CHANGELOG.md: 'Remove deprecated `config.read_encrypted_secrets`.' The setting drove the legacy encrypted-secrets feature (config/secrets.yml.enc), already dead since 7.2 removed `Rails.application.secrets`. The setter does not raise at 8.0: the assignment falls through to Railtie::Configuration#method_missing and is stored with no effect and no warning. Only the 7.2 side of a dual boot warns (`'config.read_encrypted_secrets=' is deprecated and will be removed in Rails 8.0`), which clutters boot and assets:precompile logs. 7.1 and earlier do not warn. Reading `config.read_encrypted_secrets` without assigning it first raises NoMethodError at 8.0"
+      fix: "Delete the `config.read_encrypted_secrets = true` line and its comment block (usually in config/environments/production.rb). Safe on both 7.2 and 8.0, no dual-boot branch needed. If the app still keeps secrets in config/secrets.yml.enc, move them to credentials (`bin/rails credentials:edit`) first"
+      variable_name: "READ_ENCRYPTED_SECRETS"
 
     - name: "warn_on_records_fetched_greater_than config"
       kind: "breaking"
