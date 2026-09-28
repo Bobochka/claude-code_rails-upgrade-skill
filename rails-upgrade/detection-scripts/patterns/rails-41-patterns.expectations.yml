@@ -24,3 +24,16 @@ CACHE_DIGESTS_BACKPORT:
     - "  ActionView::Digestor.digest(name: name, finder: lookup_context)"
     - "  config.action_view.cache_template_loading = true"
     - "  <% cache [@post, 'v3'] do %>"
+
+DEPRECATED_FINDERS_AUTOREQUIRE:
+  match:
+    - "gem 'activerecord-deprecated_finders'"
+    - "gem \"activerecord-deprecated_finders\", \"~> 1.0.4\""
+    - "  gem 'activerecord-deprecated_finders', require: false"
+    - "  gem 'activerecord-deprecated_finders', :require => false"
+  no_match:
+    - "gem 'activerecord-deprecated_finders', require: 'active_record/deprecated_finders'"
+    - "gem \"activerecord-deprecated_finders\", \"~> 1.0.4\", require: \"active_record/deprecated_finders\""
+    - "gem 'activerecord-deprecated_finders', :require => 'active_record/deprecated_finders'"
+    - "# gem 'activerecord-deprecated_finders'"
+    - "gem 'activerecord'"

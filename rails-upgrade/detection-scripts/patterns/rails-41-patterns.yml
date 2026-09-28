@@ -11,7 +11,7 @@ upgrade_findings:
         - "app/"
         - "lib/"
       explanation: "Rails 4.1 removed the activerecord-deprecated_finders dependency. find_all_by_*, find_last_by_*, scoped_by_*, and find_by_* (including find_by_*!) no longer work"
-      fix: "Rewrite: find_all_by_* → where(col: value); find_last_by_* → where(col: value).last; scoped_by_* → where(col: value); find_by_<col> → find_by(col: value); find_by_<col>! → find_by!(col: value). As a short-term bridge, add gem 'activerecord-deprecated_finders'"
+      fix: "Rewrite: find_all_by_* → where(col: value); find_last_by_* → where(col: value).last; scoped_by_* → where(col: value); find_by_<col> → find_by(col: value); find_by_<col>! → find_by!(col: value). As a short-term bridge, add gem 'activerecord-deprecated_finders', require: 'active_record/deprecated_finders' (without the require the gem is never loaded on 4.1, see DEPRECATED_FINDERS_AUTOREQUIRE)"
       variable_name: "DYNAMIC_FINDERS"
 
     - name: "Dynamic find_or_initialize_by_* / find_or_create_by_*"
@@ -81,6 +81,17 @@ upgrade_findings:
       explanation: "The cache_digests gem backported cache digests to Rails 4.0; Rails 4.1 ships them in core as ActionView::Digestor. The gem does not just go unused, it collides: actionview's action_view/tasks/dependencies.rake declares `class CacheDigests` inside a `namespace :cache_digests do` block, and a Rake namespace does not scope Ruby constants, so that defines top-level ::CacheDigests while the gem defines `module CacheDigests`. Class vs module on one constant raises `TypeError: CacheDigests is not a class` while Rails loads its rake tasks. The blast radius is every rake invocation, not one task — asset precompile, db tasks, and any CI step shelling out to rake all fail before running. It does not reproduce under `rails runner` or the test suite, because neither loads rake tasks, so a boot smoke test and a green suite can both pass while CI is entirely red"
       fix: "Gate the gem out of the 4.1 bundle rather than delete it while the current bundle is still 4.0 and depends on it: `gem 'cache_digests' unless NextRails.next?`. Then confirm no first-party code calls the gem API, because core's is not call-compatible: CacheDigests::TemplateDigestor.digest(name, format, finder, options) (positional) became ActionView::Digestor.digest(name:, finder:, dependencies:, partial:) (single options hash); cache_prefix and the swappable cache accessor are gone; the ['v3', 'key'] explicitly-versioned cache-key form is gone, leaving only skip_digest: true; view_cache_dependency survives unchanged in ActionView::Helpers::CacheHelper. Core's ERB dependency tracker also detects more dependencies than the gem's (it parses layout: keys and method chains), so fragment digests can shift — that is a cold fragment cache on first deploy, not an error. A hit in Gemfile.lock with nothing in the Gemfile means another gem pulls cache_digests in transitively — run `bundle why cache_digests` and gate or upgrade that parent gem instead. Delete cache_digests outright once the current Rails is 4.1"
       variable_name: "CACHE_DIGESTS_BACKPORT"
+
+    - name: "activerecord-deprecated_finders in the Gemfile without an explicit require"
+      kind: breaking
+      pattern: "^\\s*gem\\s+[\"']activerecord-deprecated_finders[\"'](?![^\\n]*:?require(:|\\s*=>)\\s*[\"'])"
+      exclude: ""
+      search_paths:
+        - "Gemfile"
+        - "Gemfile.next"
+      explanation: "Rails 4.0 lists activerecord-deprecated_finders as a dependency and active_record.rb requires it, so on 4.0 it loads whether or not the Gemfile mentions it. Rails 4.1 drops both. Adding the gem back to the Gemfile as a bridge is not enough on its own: the gem's only entry file is `active_record/deprecated_finders.rb`, and Bundler.require tries `activerecord-deprecated_finders` and then `activerecord/deprecated_finders`, finds neither, and moves on without an error. The gem ends up in the bundle but never loaded, so everything it was meant to bridge still fails on 4.1: find_all_by_*, find_last_by_*, scoped_by_*, the dynamic find_or_create_by_* / find_or_initialize_by_* forms, find(:all / :first / :last), finder options on find / first / last / calculations, update_all with conditions, and the association :conditions / :order / :include / :uniq / :readonly options. The pattern flags a `gem 'activerecord-deprecated_finders'` line that has no `require:` string, and also `require: false`, which leaves it unloaded the same way"
+      fix: "If the call sites are not migrated yet, name the entry file: `gem 'activerecord-deprecated_finders', require: 'active_record/deprecated_finders'`. It is harmless on 4.0, which loads the gem anyway, so the same line works on both sides of a dual boot. Better, once the call sites are migrated, remove the gem. `find_by_*` and `find_by_*!` are still in Rails 4.1 core and do not need it"
+      variable_name: "DEPRECATED_FINDERS_AUTOREQUIRE"
 
   medium_priority:
     - name: "MultiJSON usage"
@@ -264,7 +275,7 @@ dependencies:
   activerecord-deprecated_finders:
     check: false
     gem_name: "activerecord-deprecated_finders"
-    message: "Short-term bridge: restores find_all_by_*, find_last_by_*, scoped_by_*, and dynamic find_or_*_by_* finders removed from Rails 4.1"
+    message: "Short-term bridge: restores find_all_by_*, find_last_by_*, scoped_by_*, dynamic find_or_*_by_* finders, finder options and update_all with conditions, removed from Rails 4.1. Declare it with require: 'active_record/deprecated_finders'; a bare gem line is never loaded on 4.1"
     url: "https://github.com/rails/activerecord-deprecated_finders"
 
   spring:

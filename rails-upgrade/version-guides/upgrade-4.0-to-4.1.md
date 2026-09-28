@@ -55,11 +55,15 @@ User.find_or_initialize_by(email: email, name: name)
 User.find_or_create_by(email: email)
 ```
 
-If you cannot migrate callers now, restore the bridge gem:
+If you cannot migrate callers now, restore the bridge gem, and name its entry file:
 ```ruby
 # Gemfile
-gem 'activerecord-deprecated_finders'
+gem 'activerecord-deprecated_finders', require: 'active_record/deprecated_finders'
 ```
+
+The `require:` is not optional. On 4.0, `active_record.rb` requires the gem itself, so it loads whether or not the Gemfile mentions it. On 4.1 nothing does, and the gem's only entry file is `active_record/deprecated_finders.rb`: `Bundler.require` tries `activerecord-deprecated_finders` and then `activerecord/deprecated_finders`, finds neither, and moves on without an error. A bare `gem 'activerecord-deprecated_finders'` (or one with `require: false`) puts the gem in the bundle but never loads it, so every call it was meant to bridge still fails. The line with `require:` is harmless on 4.0, so it works on both sides of a dual boot.
+
+The gem covers more than dynamic finders: `find(:all / :first / :last)`, finder options on `find` / `first` / `last` and on calculations, `update_all` with a conditions argument, `Model.scoped`, and the association `:conditions` / `:order` / `:include` / `:uniq` / `:readonly` options. `find_by_*` and `find_by_*!` are still in Rails 4.1 core and do not need it. Remove the gem once the call sites are migrated.
 
 ---
 
@@ -632,8 +636,8 @@ gem 'rails', '~> 4.1.16'  # pin to the last 4.1 patch
 # Only if you rely on it directly
 # gem 'multi_json'
 
-# Only if you cannot migrate dynamic finders now
-# gem 'activerecord-deprecated_finders'
+# Only if you cannot migrate dynamic finders now; without require: it never loads on 4.1
+# gem 'activerecord-deprecated_finders', require: 'active_record/deprecated_finders'
 
 # Only if you depend on removed JSON encoder features
 # gem 'activesupport-json_encoder'
@@ -691,6 +695,7 @@ Error → section lookup for the most common errors encountered during this upgr
 |-------|-----|
 | `NameError: uninitialized constant MultiJSON` | "MultiJSON Removed from Rails" — add `gem 'multi_json'` or move to `to_json` / `JSON.parse` |
 | `NoMethodError: undefined method 'find_all_by_email'` | "Dynamic Finders Removed" — rewrite as `where(email: email)`, or `activerecord-deprecated_finders` temporarily |
+| `NoMethodError` on `find_all_by_*` (or another bridged call) with `activerecord-deprecated_finders` in the Gemfile | "Dynamic Finders Removed": add `require: 'active_record/deprecated_finders'` to the gem line |
 | Query returns zero rows after upgrade | "`default_scope` Chains with Other Scopes" — use `unscope(where: :col)` or `rewhere` |
 | `ActionController::InvalidAuthenticityToken` in controller tests on JS endpoints | "CSRF Protection Now Covers GET with JS Responses" — use `xhr :verb, :action` |
 | `flash.to_hash.except(:notice)` silently keeps `:notice` | "Flash Message Keys Are Strings" — use `"notice"` |
