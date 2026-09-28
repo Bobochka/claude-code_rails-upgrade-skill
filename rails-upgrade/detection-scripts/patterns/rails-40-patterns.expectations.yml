@@ -287,6 +287,23 @@ FIELD_HELPERS_SYMBOLS:
     # commented-out reference
     - "  # field_helpers - %w(label)"
 
+INSTALL_HELPERS_REMOVED:
+  # Pattern: "\\binstall_helpers\\b"; definitions and comments are skipped.
+  match:
+    - "  Rails.application.routes.install_helpers(self)"
+    - "      route_set.install_helpers"
+    - "    routes.install_helpers [ReportMailer, PdfRenderer]"
+  no_match:
+    # the replacement
+    - "  include Rails.application.routes.url_helpers"
+    # a method of the app's own that happens to share the name
+    - "  def install_helpers"
+    - "  def self.install_helpers(target)"
+    # a longer identifier
+    - "  reinstall_helpers_cache!"
+    # commented-out call
+    - "  # Rails.application.routes.install_helpers(self)"
+
 CONFIG_ROUTES_PATH:
   match:
     - "  config.paths[\"config/routes\"].concat %w(lib/custom_routes)"

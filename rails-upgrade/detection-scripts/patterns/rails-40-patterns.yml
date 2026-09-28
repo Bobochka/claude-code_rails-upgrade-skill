@@ -474,6 +474,20 @@ upgrade_findings:
       fix: "Normalize the element type before comparing: `field_helpers.map(&:to_s) - %w(label fields_for)` when the other side is strings, or `field_helpers.map(&:to_sym) - [:label, :fields_for]` when it is symbols. Both give the same list on 3.2 and 4.0, so the change ships before the bump without a NextRails.next? branch. Add a spec that builds a form with the custom builder and asserts the helpers meant to be skipped render as plain Rails output"
       variable_name: "FIELD_HELPERS_SYMBOLS"
 
+    - name: "RouteSet#install_helpers removed"
+      kind: "breaking"
+      pattern: "\\binstall_helpers\\b"
+      exclude: "^\\s*#|\\bdef\\s+(?:self\\.)?install_helpers\\b"
+      search_paths:
+        - "app/"
+        - "lib/"
+        - "config/"
+        - "spec/"
+        - "test/"
+      explanation: "Rails 3.2's ActionDispatch::Routing::RouteSet#install_helpers(destinations = [ActionController::Base, ActionView::Base]) mixed a route set's named-route helpers into the given classes. Rails 4.0 removed the method, so `Rails.application.routes.install_helpers(SomeClass)` or `route_set.install_helpers` raises NoMethodError wherever it runs: at class load in app code, or in the setup of a spec that builds its own RouteSet. The pattern flags every call; a method definition named install_helpers is excluded"
+      fix: "Include the route set's url_helpers module instead, which exists on 3.2 and 4.0, so the change ships before the bump: `include Rails.application.routes.url_helpers` inside the class, or `SomeClass.send(:include, route_set.url_helpers)` from outside it (`include` is private on Ruby versions before 2.1). For a spec that called `route_set.install_helpers` with no argument, include the module into the classes it used to target, usually ActionView::Base or the view object under test"
+      variable_name: "INSTALL_HELPERS_REMOVED"
+
     - name: "config.paths[\"config/routes\"] (without .rb)"
       kind: "breaking"
       pattern: "config\\.paths\\[.config/routes.\\]"
