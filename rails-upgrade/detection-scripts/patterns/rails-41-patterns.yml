@@ -3,15 +3,15 @@ description: "Breaking change patterns for Rails 4.0 → 4.1 upgrade"
 
 upgrade_findings:
   high_priority:
-    - name: "Dynamic finders (find_all_by / find_last_by / scoped_by / find_by)"
+    - name: "Dynamic finders (find_all_by / find_last_by / scoped_by)"
       kind: breaking
-      pattern: "\\.(find_all_by_|find_last_by_|scoped_by_|find_by_)[a-zA-Z_0-9]+!?"
-      exclude: "\\.find_by\\s*\\("
+      pattern: "\\.(find_all_by_|find_last_by_|scoped_by_)[a-zA-Z_0-9]+"
+      exclude: ""
       search_paths:
         - "app/"
         - "lib/"
-      explanation: "Rails 4.1 removed the activerecord-deprecated_finders dependency. find_all_by_*, find_last_by_*, scoped_by_*, and find_by_* (including find_by_*!) no longer work"
-      fix: "Rewrite: find_all_by_* → where(col: value); find_last_by_* → where(col: value).last; scoped_by_* → where(col: value); find_by_<col> → find_by(col: value); find_by_<col>! → find_by!(col: value). As a short-term bridge, add gem 'activerecord-deprecated_finders', require: 'active_record/deprecated_finders' (without the require the gem is never loaded on 4.1, see DEPRECATED_FINDERS_AUTOREQUIRE)"
+      explanation: "Rails 4.1 removed the activerecord-deprecated_finders dependency, which is where find_all_by_*, find_last_by_* and scoped_by_* were defined, so they raise NoMethodError. find_by_* and find_by_*! are not flagged: Rails 4.1 core still defines them (ActiveRecord::DynamicMatchers::FindBy and FindByBang). The dynamic find_or_create_by_* / find_or_initialize_by_* forms are FIND_OR_X_BY_DYNAMIC"
+      fix: "Rewrite: find_all_by_* → where(col: value); find_last_by_* → where(col: value).last; scoped_by_* → where(col: value). Leave find_by_* and find_by_*! alone, they still work on 4.1. As a short-term bridge, add gem 'activerecord-deprecated_finders', require: 'active_record/deprecated_finders' (without the require the gem is never loaded on 4.1, see DEPRECATED_FINDERS_AUTOREQUIRE)"
       variable_name: "DYNAMIC_FINDERS"
 
     - name: "Dynamic find_or_initialize_by_* / find_or_create_by_*"

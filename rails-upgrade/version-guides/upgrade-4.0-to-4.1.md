@@ -27,7 +27,7 @@ The breaking changes are smaller than 3.2 → 4.0 but several silently change be
 #### Dynamic Finders Removed
 
 **What Changed:**
-`activerecord-deprecated_finders` was removed as a Rails dependency. `find_all_by_*`, `find_last_by_*`, `scoped_by_*`, `find_or_initialize_by_*`, and `find_or_create_by_*` no longer work out of the box.
+`activerecord-deprecated_finders` was removed as a Rails dependency. `find_all_by_*`, `find_last_by_*`, `scoped_by_*`, `find_or_initialize_by_*`, and `find_or_create_by_*` no longer work out of the box. `find_by_*` and `find_by_*!` are unaffected: Rails 4.1 core still defines them.
 
 **Detection Pattern:**
 ```ruby

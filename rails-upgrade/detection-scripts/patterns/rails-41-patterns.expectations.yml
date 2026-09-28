@@ -11,6 +11,19 @@
 # Run with:
 #   bin/test-patterns rails-upgrade/detection-scripts/patterns/rails-41-patterns.yml
 
+DYNAMIC_FINDERS:
+  match:
+    - "User.find_all_by_email(email)"
+    - "User.find_last_by_email(email)"
+    - "User.scoped_by_status(\"active\")"
+    - "  owner.items.find_all_by_color_and_size(color, size)"
+  no_match:
+    - "User.find_by_email(email)"
+    - "User.find_by_email!(email)"
+    - "User.find_by(email: email)"
+    - "User.find_by_sql(sql)"
+    - "User.where(email: email).last"
+
 CACHE_DIGESTS_BACKPORT:
   match:
     - "gem 'cache_digests'"
