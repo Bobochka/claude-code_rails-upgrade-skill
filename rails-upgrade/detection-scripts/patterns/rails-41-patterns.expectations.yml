@@ -59,6 +59,9 @@ COUNT_MULTI_COLUMN_SELECT:
     # A table-qualified star: 4.1 runs COUNT(posts.*).
     - "    Post.joins(:author).select(\"posts.*\").count"
     - "  scope :with_author, -> { joins(:author).select(\"#{table_name}.*\") }"
+    - "    Post.select(:id, \"title\")"
+    - "    Post.select(%w[id title])"
+    - "  scope :summary, -> { select \"id, title\" }"
   no_match:
     - "    Post.select(:title).count"
     # A bare star becomes COUNT(*), which works on 4.1.
@@ -69,6 +72,10 @@ COUNT_MULTI_COLUMN_SELECT:
     - "    items.select { |item| item.valid? }"
     # The lookbehind keeps the bare in-scope form while skipping longer names.
     - "    multiselect(\"title, version\")"
+    # The ActionView select form helper, not a relation.
+    - "<%= select(\"post\", \"person_id\", Person.all.collect { |p| [p.name, p.id] }) %>"
+    - "  = f.select :category, :name"
+    - "    IO.select([sock], nil, nil, 5)"
 
 JOIN_DEPENDENCY_INTERNALS:
   match:

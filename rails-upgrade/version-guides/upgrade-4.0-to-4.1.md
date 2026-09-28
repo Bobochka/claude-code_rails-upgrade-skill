@@ -500,7 +500,7 @@ Rails 4.0 ignores a `select` list that contains a comma or `*` when it builds a 
 ActiveRecord::StatementInvalid: SQLite3::SQLException: wrong number of arguments to function COUNT(): SELECT COUNT(title, version) FROM "posts"
 ```
 
-PostgreSQL (`function count(...) does not exist`) and MySQL (`ERROR 1064`, a syntax error) reject it too. A table-qualified star breaks the same way: `Post.joins(:author).select("posts.*").count` runs `SELECT COUNT(posts.*) FROM ...` on 4.1, which SQLite and MySQL reject as a syntax error (PostgreSQL accepts it). A bare `select("*")` is fine: it becomes `COUNT(*)`. It only breaks when something calls `count` with no argument on that relation. `size` is safe on 4.1, because it calls `count(:all)` when the relation is not loaded.
+PostgreSQL (`function count(...) does not exist`) and MySQL (`ERROR 1064`, a syntax error) reject it too. A table-qualified star breaks the same way: `Post.joins(:author).select("posts.*").count` runs `SELECT COUNT(posts.*) FROM ...` on 4.1, which SQLite and MySQL reject as a syntax error (PostgreSQL accepts it). A bare `select("*")` is fine: it becomes `COUNT(*)`. It only breaks when something calls `count` with no argument on that relation. `size` on a relation is safe on 4.1, because it calls `count(:all)` when the relation is not loaded. `size` on a `has_many` association that is not loaded is not safe: it calls `count` with no argument, so `has_many :summaries, -> { select("id, title") }` followed by `owner.summaries.size` raises. `empty?` and `any?` run an `exists?` query and are safe.
 
 **Detection Pattern:**
 ```ruby
@@ -519,6 +519,8 @@ Post.select("title, version").count
 # AFTER
 Post.select("title, version").count(:all)
 ```
+
+On an association with a multi-column `select` in its scope, `owner.summaries.size` breaks the same way, so use `owner.summaries.count(:all)` there.
 
 The select and the `count` are often far apart: a scope or a method returns the relation and a caller, or a spec, counts it. Trace every caller of each flagged relation.
 
