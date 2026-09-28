@@ -373,6 +373,48 @@ get '/home' => 'home#index'
 
 ---
 
+#### Format Validators Reject Multiline Anchors
+
+**What Changed:**
+Rails 4.0 checks every format validator's `with:` and `without:` regex when the validator
+is declared. A regex that starts with `^` or ends with an unescaped `$` raises unless the
+validator passes `multiline: true`:
+
+```
+ArgumentError: The provided regular expression is using multiline anchors (^ or $), which may present a security risk. Did you mean to use \A and \z, or forgot to add the :multiline => true option?
+```
+
+The check runs while the class loads, so one such validator stops boot. Rails 3.2 has no
+check. Only the start and end of the regex count: a `^` inside a character class
+(`/\A[^@]+\z/`) or a `$` in the middle is fine.
+
+**Detection Pattern:**
+```ruby
+validates_format_of :slug, with: /^[a-z-]+$/
+validates :code, format: { with: /^[A-Z]{3}$/ }
+validates :code, format: /^[A-Z]{3}$/
+```
+
+A regex stored in a constant (`with: SLUG_FORMAT`) or built with `Regexp.new` raises the
+same way, so look up the constant behind every `with:` that is not a literal.
+
+**Fix:**
+```ruby
+# BEFORE
+validates_format_of :slug, with: /^[a-z-]+$/
+
+# AFTER
+validates_format_of :slug, with: /\A[a-z-]+\z/
+```
+
+Ruby accepts `\A` and `\z` on every version, so the rewrite needs no `NextRails.next?`
+branch. `\z` is stricter than `$`: `$` also matched before a trailing newline, so a value
+ending in a newline that passed on 3.2 now fails validation. If the attribute holds
+several lines and each line must match, keep the anchors and add `multiline: true`
+instead; Rails 3.2 ignores the option.
+
+---
+
 #### Remote Forms Stop Embedding the CSRF Token
 
 **What Changed:**
@@ -1178,6 +1220,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Scope returns wrong results or errors | "Scopes", under "Scopes and Association Options Require Lambda" — add lambda |
 | `Unknown key: :conditions` | "Association `:conditions` hash → lambda with `where()`", under "Scopes and Association Options Require Lambda" — move to lambda |
 | `No route matches` | "Routes Require HTTP Method" — add HTTP method |
+| `ArgumentError: The provided regular expression is using multiline anchors (^ or $)` | "Format Validators Reject Multiline Anchors": use `\A` and `\z` |
 | Remote form POST arrives with no session or current user | "Remote Forms Stop Embedding the CSRF Token" — pin `embed_authenticity_token_in_remote_forms` |
 | `ArgumentError: The method .order() must contain arguments.` | "`order` and `reorder` Require Arguments" — name the column, `order(:id)` for `.order.last` |
 | `ArgumentError: Direction should be :asc or :desc` | "`order` and `reorder` Require Arguments" — hash values must be `:asc` / `:desc`; use strings across joins |
