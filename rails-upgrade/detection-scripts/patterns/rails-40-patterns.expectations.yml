@@ -560,7 +560,7 @@ REMOTE_FORM_CSRF_TOKEN:
 
 ORDER_WITHOUT_ARGUMENTS:
   # Pattern: a bare order/reorder with nothing to sort by. Requires either a
-  # relation method right after the call, or empty / nil / [] arguments, so
+  # relation method right after the call, or empty parentheses, so
   # that reading an `order` association or column does not get flagged.
   match:
     - '        link = Membership.where(user_id: user_id).order.last'
