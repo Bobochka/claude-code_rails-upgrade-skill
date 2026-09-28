@@ -472,7 +472,7 @@ upgrade_findings:
     - name: "order / reorder hash whose value is not :asc or :desc"
       kind: "breaking"
       pattern: "(?<![A-Za-z0-9_])(?:re)?order\\(\\s*(?:(?:[^()]|\\([^()]*\\))*?,\\s*)??\\[?\\s*\\{?\\s*(?::?\\w+|\"[^\"\\n]*\"|'[^'\\n]*')\\s*(?::(?!:)|=>)\\s*(?!:(?:asc|desc)\\s*[,}\\])])[^\\s,)}\\]]"
-      exclude: ""
+      exclude: "\\A\\s*(?:-?#|//)|\\$\\.(?:re)?order\\("
       search_paths:
         - "app/"
         - "lib/"
@@ -492,8 +492,8 @@ upgrade_findings:
 
     - name: "update_all with conditions (two-arg and three-arg forms)"
       kind: "deprecation"
-      pattern: "\\bupdate_all(?:\\(\\s*|[ \\t]+)(?:\\{[^{}]*\\}|\\[[^\\[\\]]*\\]|\"[^\"\\n]*\"|'[^'\\n]*'|[\\w.@:]+(?:\\([^()\\n]*\\))?(?![\\w:]))\\s*,"
-      exclude: "^\\s*#"
+      pattern: "(?<!def )(?<!def self\\.)\\bupdate_all(?:\\(\\s*|[ \\t]+)(?:\\{[^{}]*\\}|\\[[^\\[\\]]*\\]|\"[^\"\\n]*\"|'[^'\\n]*'|[\\w.@:]+(?:\\([^()\\n]*\\))?(?![\\w:]))\\s*,"
+      exclude: "\\A\\s*#"
       search_paths:
         - "app/"
         - "lib/"
@@ -525,7 +525,7 @@ upgrade_findings:
         - "lib/"
         - "spec/"
         - "test/"
-      explanation: "Rails 4.0 removed `scoped` from Active Record. activerecord-deprecated_finders, a dependency of activerecord 4.0, adds it back and prints `DEPRECATION WARNING: Model.scoped is deprecated. Please use Model.all instead.` on every call, with or without an options hash (`scoped(conditions: ..., include: ...)`), on a class, a relation or an association. Rails 4.1 drops the gem and every form raises NoMethodError. The pattern matches `.scoped` after any receiver and a receiverless `scoped` used as a value inside the model (`scoped.where(...)`, `-> { scoped }`, `x ? scoped : y`, a bare `scoped` return, or an argument such as `merge(scoped)`). It skips `unscoped`, `default_scoped`, `scoped_by_*`, a `def scoped` line, an assignment to a local named `scoped`, an RSpec `and_return(scoped)`, comment lines, and prose such as `scoped to` or `team-scoped` inside strings. Two shapes still match and are not the Active Record method: a local variable or `let` named `scoped` read with a method call or passed as an argument (`scoped.to_sql`, `foo(scoped)`), and an app object that defines its own `scoped` method (a query or presenter object); check for a `def scoped` or `let(:scoped)` before rewriting"
+      explanation: "Rails 4.0 removed `scoped` from Active Record. activerecord-deprecated_finders, a dependency of activerecord 4.0, adds it back and prints `DEPRECATION WARNING: Model.scoped is deprecated. Please use Model.all instead.` on every call, with or without an options hash (`scoped(conditions: ..., include: ...)`), on a class, a relation or an association. Rails 4.1 drops the gem and every form raises NoMethodError. The pattern matches `.scoped` after any receiver and a receiverless `scoped` used as a value inside the model (`scoped.where(...)`, `-> { scoped }`, `x ? scoped : y`, a bare `scoped` return, or an argument such as `merge(scoped)`). It skips `unscoped`, `default_scoped`, `scoped_by_*`, a `def scoped` line, an assignment to a local named `scoped`, an RSpec `and_return(scoped)`, comment lines, and prose such as `scoped to` or `team-scoped` inside strings. Prose where `scoped` ends a phrase (`\"results are scoped, then sorted\"`, a trailing `# ... scoped` comment, plain view text ending in scoped) still matches, so read each hit. Two shapes still match and are not the Active Record method: a local variable or `let` named `scoped` read with a method call or passed as an argument (`scoped.to_sql`, `foo(scoped)`), and an app object that defines its own `scoped` method (a query or presenter object); check for a `def scoped` or `let(:scoped)` before rewriting"
       fix: "Rewrite so the call works on Rails 3.2 and 4.0 and can ship before the bump. Bare `Model.scoped` or a receiverless `scoped` becomes `where(nil)`, which returns a Relation with no conditions on both versions. Do not use `all` before the bump: on 3.2 `all` loads the records into an Array, which breaks any chained scope call. `relation.scoped` and `association.scoped` can drop the `.scoped`, or use `.where(nil)` where the call site needs a Relation rather than the association proxy. The options form maps each key to its relation method: `scoped(conditions: c, include: i, joins: j, order: o, limit: n)` becomes `where(c).includes(i).joins(j).order(o).limit(n)`. After the bump, `all` is the 4.0 spelling of the bare form"
       variable_name: "CLASS_SCOPED"
 
@@ -542,7 +542,7 @@ upgrade_findings:
 
     - name: "Dynamic finders (find_all_by_*)"
       kind: "deprecation"
-      pattern: "(?<![\\w:\"'#])(?<!def )(?<!def self\\.)find_all_by_\\w+"
+      pattern: "(?<![\\w:\"'#])(?<!def )(?<!def self\\.)find_all_by_\\w+|send\\(\\s*:?[\"']?find_all_by_"
       exclude: ""
       search_paths:
         - "app/"
@@ -555,7 +555,7 @@ upgrade_findings:
 
     - name: "Dynamic finders (find_or_create_by_*)"
       kind: "deprecation"
-      pattern: "(?<![\\w:\"'#])(?<!def )(?<!def self\\.)find_or_create_by_\\w+"
+      pattern: "(?<![\\w:\"'#])(?<!def )(?<!def self\\.)find_or_create_by_\\w+|send\\(\\s*:?[\"']?find_or_create_by_"
       exclude: ""
       search_paths:
         - "app/"
@@ -568,7 +568,7 @@ upgrade_findings:
 
     - name: "Dynamic finders (find_or_initialize_by_*)"
       kind: "deprecation"
-      pattern: "(?<![\\w:\"'#])(?<!def )(?<!def self\\.)find_or_initialize_by_\\w+"
+      pattern: "(?<![\\w:\"'#])(?<!def )(?<!def self\\.)find_or_initialize_by_\\w+|send\\(\\s*:?[\"']?find_or_initialize_by_"
       exclude: ""
       search_paths:
         - "app/"
@@ -581,7 +581,7 @@ upgrade_findings:
 
     - name: "Dynamic finders (find_last_by_*)"
       kind: "deprecation"
-      pattern: "(?<![\\w:\"'#])(?<!def )(?<!def self\\.)find_last_by_\\w+"
+      pattern: "(?<![\\w:\"'#])(?<!def )(?<!def self\\.)find_last_by_\\w+|send\\(\\s*:?[\"']?find_last_by_"
       exclude: ""
       search_paths:
         - "app/"

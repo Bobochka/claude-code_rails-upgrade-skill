@@ -1242,7 +1242,7 @@ bundle update rails
 1. Add lambda to all scopes
 2. **Migrate all association `:conditions`, `:order`, `:extend`, `:uniq` options to lambda syntax** (this is typically the highest-volume change)
 3. Rewrite `:finder_sql` associations as scopes or methods; remove `:readonly` options
-4. Replace `Model.scoped` with `where(nil)` and rewrite `find_all_by_*`, `find_last_by_*`, `find_or_create_by_*` and `find_or_initialize_by_*` with `where` (`find_by_*` can stay), and move `update_all` conditions into `where`
+4. Replace `Model.scoped` with `where(nil)` and rewrite `find_all_by_*`, `find_last_by_*`, `find_or_create_by_*`, `find_or_initialize_by_*` and `scoped_by_*` with `where` (`find_by_*` can stay). No 4.0 pattern flags `scoped_by_*` (the 4.1 patterns do), so grep for it by hand, and move `update_all` conditions into `where`
 5. Add HTTP methods to routes
 6. Migrate to Strong Parameters and remove `require 'strong_parameters'` calls
 7. Replace `rescue_action` with `rescue_from`
