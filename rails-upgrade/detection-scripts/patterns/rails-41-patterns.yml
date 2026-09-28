@@ -84,7 +84,7 @@ upgrade_findings:
 
     - name: "JoinDependency::JoinAssociation internals (parent_table_name, join_to)"
       kind: breaking
-      pattern: "(\\.parent_table_name\\b|JoinDependency::JoinAssociation\\b|def join_to\\b)"
+      pattern: "(\\.(?:parent_table(?:_name)?|aliased_prefix|join_dependency)\\b|JoinDependency::JoinAssociation\\b|\\bclass JoinAssociation\\b|def join_to\\b|:join_to\\b)"
       exclude: "^\\s*#"
       search_paths:
         - "app/"
@@ -92,7 +92,7 @@ upgrade_findings:
         - "config/initializers/"
         - "spec/"
         - "test/"
-      explanation: "Rails 4.1 rewrote ActiveRecord::Associations::JoinDependency. JoinAssociation no longer keeps a parent, so parent_table_name (4.0 delegated it to the parent) is gone, and join_to(manager) became join_constraints(foreign_table, foreign_klass, node, join_type, tables, scope_chain, chain). Two kinds of app code reach into it. An association scope that takes an argument receives the JoinAssociation when the association is joined, so a scope that builds SQL from join.parent_table_name raises NoMethodError on 4.1 as soon as the association is used in joins. A monkeypatch on join_to fails in one of two ways: alias_method_chain :join_to raises NameError at load, while a prepended module that overrides join_to loads fine and is never called, so the SQL it added silently disappears from every join"
+      explanation: "Rails 4.1 rewrote ActiveRecord::Associations::JoinDependency. JoinAssociation no longer keeps a parent, so parent_table_name (4.0 delegated it to the parent) is gone, along with parent, parent_table, join_dependency, join_type and aliased_prefix, and join_to(manager) became join_constraints(foreign_table, foreign_klass, node, join_type, tables, scope_chain, chain). Two kinds of app code reach into it. An association scope that takes an argument receives the JoinAssociation when the association is joined, so a scope that builds SQL from join.parent_table_name raises NoMethodError on 4.1 as soon as the association is used in joins. A monkeypatch on join_to fails in one of two ways: alias_method_chain :join_to raises NameError at load, while a prepended module that overrides join_to loads fine and is never called, so the SQL it added silently disappears from every join. The pattern flags calls to .parent_table_name, .parent_table, .aliased_prefix and .join_dependency, any reference to JoinDependency::JoinAssociation or a reopened class JoinAssociation, a def join_to, and the :join_to symbol an alias_method_chain or alias_method takes. It does not flag .parent or .join_type, which are too common outside this class: check any association scope that takes an argument for them by hand"
       fix: "In an association scope, aliased_table_name still exists on the 4.1 JoinAssociation, but the parent side's table name does not. Use the parent model's table name directly when the parent table is not aliased, or move the condition into a scope applied where the query is built. For a join_to patch, write a join_constraints version for 4.1 (new signature) and pick between the two with NextRails.next?. Then compare the generated SQL (to_sql) on both bundles: a patch that silently stops running changes queries without necessarily failing a test"
       variable_name: "JOIN_DEPENDENCY_INTERNALS"
 

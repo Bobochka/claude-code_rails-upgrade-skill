@@ -210,7 +210,7 @@ Delete the gem outright once the current Rails is 4.1.
 #### `JoinDependency` Internals Changed (`parent_table_name`, `join_to`)
 
 **What Changed:**
-Rails 4.1 rewrote `ActiveRecord::Associations::JoinDependency`. `JoinAssociation` no longer keeps a parent, so `parent_table_name` (4.0 delegated it to the parent) is gone, and `join_to(manager)` became `join_constraints(foreign_table, foreign_klass, node, join_type, tables, scope_chain, chain)`. The class is `:nodoc:`, but two kinds of app code reach into it:
+Rails 4.1 rewrote `ActiveRecord::Associations::JoinDependency`. `JoinAssociation` no longer keeps a parent, so `parent_table_name` (4.0 delegated it to the parent) is gone, along with `parent`, `parent_table`, `join_dependency`, `join_type` and `aliased_prefix`, and `join_to(manager)` became `join_constraints(foreign_table, foreign_klass, node, join_type, tables, scope_chain, chain)`. The class is `:nodoc:`, but two kinds of app code reach into it:
 
 - **An association scope that takes an argument.** When the association is used in `joins`, Rails passes the `JoinAssociation` to the scope. A scope that builds SQL from `parent_table_name` raises on 4.1:
   ```
@@ -228,7 +228,16 @@ module SoftDeleteJoin
   def join_to(manager) ... end
 end
 ActiveRecord::Associations::JoinDependency::JoinAssociation.send(:prepend, SoftDeleteJoin)
+
+class ActiveRecord::Associations::JoinDependency
+  class JoinAssociation
+    def join_to_with_soft_delete(manager) ... end
+    alias_method_chain :join_to, :soft_delete
+  end
+end
 ```
+
+The pattern also flags `.parent_table`, `.aliased_prefix` and `.join_dependency`. It skips `.parent` and `.join_type`, which are too common elsewhere, so read every association scope that takes an argument for those two by hand.
 
 **Fix:**
 ```ruby

@@ -73,6 +73,15 @@ JOIN_DEPENDENCY_INTERNALS:
     - "    where(\"#{join.aliased_table_name}.account_id = #{join.parent_table_name}.account_id\")"
     - "  ActiveRecord::Associations::JoinDependency::JoinAssociation.send(:prepend, SoftDeleteJoin)"
     - "      def join_to(manager)"
+    # An alias_method_chain patch: def join_to_with_soft_delete has no word
+    # boundary after join_to, so the :join_to symbol is what catches it.
+    - "        alias_method_chain :join_to, :soft_delete"
+    - "        alias_method :join_to_without_soft_delete, :join_to"
+    # Reopening the class inside class JoinDependency never spells the full name.
+    - "      class JoinAssociation < JoinPart"
+    - "    where(\"#{join.parent_table.name}.active = 1\")"
+    - "    prefix = join.aliased_prefix"
+    - "    tracker = join.join_dependency.alias_tracker"
   no_match:
     # Commented-out code is excluded.
     - "  # def join_to(manager) moved to join_constraints in 4.1"
@@ -81,6 +90,11 @@ JOIN_DEPENDENCY_INTERNALS:
     - "    where(\"#{join.aliased_table_name}.deleted_at IS NULL\")"
     - "  def join_token"
     - "    self.parent_table_names = []"
+    # Too common outside JoinAssociation to flag.
+    - "    where(\"#{join.parent.aliased_table_name}.id IS NOT NULL\")"
+    - "    self.join_type = :inner"
+    - "  class JoinAssociationsController < ApplicationController"
+    - "    record.join_token"
 
 RECORD_NOT_FOUND_MESSAGE:
   match:
