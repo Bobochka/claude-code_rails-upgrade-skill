@@ -491,13 +491,14 @@ Rails 4.0 ignores a `select` list that contains a comma or `*` when it builds a 
 ActiveRecord::StatementInvalid: SQLite3::SQLException: wrong number of arguments to function COUNT(): SELECT COUNT(title, version) FROM "posts"
 ```
 
-PostgreSQL (`function count(...) does not exist`) and MySQL (`ERROR 1064`, a syntax error) reject it too. It only breaks when something calls `count` with no argument on that relation. `size` is safe on 4.1, because it calls `count(:all)` when the relation is not loaded.
+PostgreSQL (`function count(...) does not exist`) and MySQL (`ERROR 1064`, a syntax error) reject it too. A table-qualified star breaks the same way: `Post.joins(:author).select("posts.*").count` runs `SELECT COUNT(posts.*) FROM ...` on 4.1, which SQLite and MySQL reject as a syntax error (PostgreSQL accepts it). A bare `select("*")` is fine: it becomes `COUNT(*)`. It only breaks when something calls `count` with no argument on that relation. `size` is safe on 4.1, because it calls `count(:all)` when the relation is not loaded.
 
 **Detection Pattern:**
 ```ruby
 Post.select("title, version").count
 Post.select(:title, :version).count
 Post.select([:title, :version]).count
+Post.joins(:author).select("posts.*").count
 scope :summary, -> { select("id, title") }  # counted later: Post.summary.count
 ```
 
@@ -843,7 +844,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `TypeError: CacheDigests is not a class` from every `rake` task | "`cache_digests` Gem Collides with Core Cache Digests" — `gem 'cache_digests' unless NextRails.next?`, move `CacheDigests::*` calls to `ActionView::Digestor` |
 | API clients fail to parse `2024-01-01T00:00:00.000Z` | "`as_json` Millisecond Precision for Time/DateTime/TWZ" — `ActiveSupport::JSON::Encoding.time_precision = 0` or update consumers |
 | `NoMethodError: undefined method 'sort!' for #<Post::ActiveRecord_Relation...>` on a `.all` result | "`Relation#all` Returns a Relation, Not an Array": replace `rel.all` with `rel.to_a` |
-| `ActiveRecord::StatementInvalid` with `SELECT COUNT(title, version)` | "`count` on a Multi-Column `select` Builds Invalid SQL": call `count(:all)` |
+| `ActiveRecord::StatementInvalid` with `SELECT COUNT(title, version)` or `SELECT COUNT(posts.*)` | "`count` on a Multi-Column `select` Builds Invalid SQL": call `count(:all)` |
 | `NoMethodError: undefined method 'parent_table_name' for #<ActiveRecord::Associations::JoinDependency::JoinAssociation...>` | "`JoinDependency` Internals Changed (`parent_table_name`, `join_to`)": build the SQL without `parent_table_name` |
 | A join condition added by a `join_to` patch is missing from the SQL | "`JoinDependency` Internals Changed (`parent_table_name`, `join_to`)": port the patch to `join_constraints` |
 | Spec expects `Couldn't find Post with id=1` and gets `Couldn't find Post with 'id'=1` | "`RecordNotFound` Messages Quote the Primary Key": assert status and exception class, or match both forms |

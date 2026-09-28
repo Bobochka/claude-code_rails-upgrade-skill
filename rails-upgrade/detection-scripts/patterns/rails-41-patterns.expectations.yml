@@ -54,8 +54,13 @@ COUNT_MULTI_COLUMN_SELECT:
     - "    Post.select(\"title\", \"version\")"
     - "    Post.select([:title, :version])"
     - "    Post.select(:title, :version)"
+    # A table-qualified star: 4.1 runs COUNT(posts.*).
+    - "    Post.joins(:author).select(\"posts.*\").count"
+    - "  scope :with_author, -> { joins(:author).select(\"#{table_name}.*\") }"
   no_match:
     - "    Post.select(:title).count"
+    # A bare star becomes COUNT(*), which works on 4.1.
+    - "    Post.select(\"*\").count"
     - "    Post.select(\"DISTINCT title\")"
     - "    Post.select(\"COUNT(*) AS total\")"
     - "    Post.select(\"title\").where(\"a, b\")"
