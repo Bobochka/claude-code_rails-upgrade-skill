@@ -93,6 +93,17 @@ upgrade_findings:
       fix: "Move the option under data: `confirm: \"Are you sure?\"` becomes `data: { confirm: \"Are you sure?\" }` (hash rocket form: `:data => { :confirm => \"Are you sure?\" }`). The data: form renders the same data-confirm attribute on 4.0 and 4.1, so the rewrite needs no NextRails.next? branch and can land before the bump. Keep the message argument as written, including an I18n.t(...) call. If the helper already has a data: hash, add confirm: to it rather than passing a second data: key"
       variable_name: "CONFIRM_OPTION"
 
+    - name: "include AbstractController::Layouts (moved to ActionView::Layouts)"
+      kind: breaking
+      pattern: "include\\s+(?:::)?AbstractController::Layouts\\b"
+      exclude: ""
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4.1 extracted Action View into its own actionview gem and moved the layouts module with it: AbstractController::Layouts (actionpack/lib/abstract_controller/layouts.rb on 4.0) became ActionView::Layouts (actionview/lib/action_view/layouts.rb), and no alias was left behind. A class that includes the old constant raises `NameError: uninitialized constant AbstractController::Layouts` when it loads, so eager loading fails at boot in production and the first request or test that touches the class fails in development. The usual users are custom renderers built on AbstractController::Base (PDF, report, or export renderers) that need layouts outside a controller. ActionController::Base and ActionMailer::Base switch modules on their own and are not affected"
+      fix: "ActionView::Layouts does not exist on 4.0, so while both versions boot pick the module at load time: `include(NextRails.next? ? ActionView::Layouts : AbstractController::Layouts)`. Once 4.1 is the current version, replace it with `include ActionView::Layouts`. The layout DSL (`layout \"report\"`, `_layout`, `action_has_layout?`) is the same in both modules"
+      variable_name: "ABSTRACT_CONTROLLER_LAYOUTS"
+
   medium_priority:
     - name: "MultiJSON usage"
       kind: breaking

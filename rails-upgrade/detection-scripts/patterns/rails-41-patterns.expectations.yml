@@ -45,3 +45,14 @@ CONFIRM_OPTION:
     - "<%= f.submit \"Save\", data: { disable_with: \"Saving...\", confirm: \"Save?\" } %>"
     - "      confirm: \"Are you sure?\","
     - "<%= f.password_field :password_confirmation %>"
+
+ABSTRACT_CONTROLLER_LAYOUTS:
+  match:
+    - "  include AbstractController::Layouts"
+    - "  include ::AbstractController::Layouts"
+    - "    include AbstractController::Layouts # needed for layout \"pdf\""
+  no_match:
+    - "  include ActionView::Layouts"
+    - "  include(NextRails.next? ? ActionView::Layouts : AbstractController::Layouts)"
+    - "  include AbstractController::Rendering"
+    - "  include AbstractController::LayoutsHelper"

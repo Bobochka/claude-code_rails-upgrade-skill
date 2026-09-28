@@ -250,6 +250,41 @@ The `data:` form renders the same `data-confirm` attribute on 4.0 and 4.1, so th
 
 ---
 
+#### `AbstractController::Layouts` Moved to `ActionView::Layouts`
+
+**What Changed:**
+Rails 4.1 extracted Action View from Action Pack into the new `actionview` gem, and the layouts module moved with it: `AbstractController::Layouts` became `ActionView::Layouts`. No alias was left behind, so any class that still includes the old constant raises when it loads:
+
+```
+NameError: uninitialized constant AbstractController::Layouts
+```
+
+With eager loading on, that stops the app from booting. `ActionController::Base` and `ActionMailer::Base` include the new module themselves; the break hits custom renderers built on `AbstractController::Base` (PDF, report, or export renderers) that include the module by hand.
+
+**Detection Pattern:**
+```ruby
+class ReportRenderer < AbstractController::Base
+  include AbstractController::Rendering
+  include AbstractController::Layouts
+end
+```
+
+**Fix:**
+```ruby
+# BEFORE
+include AbstractController::Layouts
+
+# AFTER, while both versions boot (ActionView::Layouts does not exist on 4.0)
+include(NextRails.next? ? ActionView::Layouts : AbstractController::Layouts)
+
+# AFTER, once 4.1 is the current version
+include ActionView::Layouts
+```
+
+The `layout` DSL is the same in both modules, so nothing else in the class changes.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### MultiJSON Removed from Rails
@@ -716,6 +751,7 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 13. Remove MultiJSON usage or add it back to the `Gemfile` explicitly.
 14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
 15. Move `:confirm` on `link_to` / `button_to` / `submit_tag` / `f.submit` under `data: { confirm: ... }`.
+15. Switch `include AbstractController::Layouts` to `ActionView::Layouts` (branch on `NextRails.next?` while both versions boot).
 
 ### Phase 6: Testing
 - Run full test suite.
@@ -743,6 +779,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `TypeError: CacheDigests is not a class` from every `rake` task | "`cache_digests` Gem Collides with Core Cache Digests" — `gem 'cache_digests' unless NextRails.next?`, move `CacheDigests::*` calls to `ActionView::Digestor` |
 | API clients fail to parse `2024-01-01T00:00:00.000Z` | "`as_json` Millisecond Precision for Time/DateTime/TWZ" — `ActiveSupport::JSON::Encoding.time_precision = 0` or update consumers |
 | Delete link or submit button no longer asks for confirmation; the HTML has `confirm="..."` instead of `data-confirm` | "`:confirm` Option on Link and Button Helpers Removed"; move it to `data: { confirm: ... }` |
+| `NameError: uninitialized constant AbstractController::Layouts` | "`AbstractController::Layouts` Moved to `ActionView::Layouts`"; include `ActionView::Layouts` instead |
 
 ---
 
