@@ -379,7 +379,7 @@ REQUEST_ENV_MERGE:
     - "request.headers.merge!('HTTP_AUTHORIZATION' => token)"
 
 DUPLICATE_ROOT_ROUTES:
-  # Pattern: "^\\s*root\\s+(to:|=>|['\"])"
+  # Pattern: a root declaration in any hash or string form; `as:` names it.
   # Rails 4 rejects a second `root`; flag every root declaration so a human can
   # count them (a lone hit is noise, 2+ is the breaking case).
   match:
@@ -391,7 +391,17 @@ DUPLICATE_ROOT_ROUTES:
     - "  root \"home#index\""
     # Rails 4 single-quoted string shorthand
     - "  root 'home#index'"
+    # 3.2-era hash rocket on :to
+    - "  root :to => 'pages#home', :constraints => WwwConstraint"
+    # controller / action keys and the paren form
+    - "  root controller: \"pages\", action: \"home\""
+    - "  root(to: \"pages#home\")"
+    # a trailing comment mentioning as: does not name the route
+    - "  root to: \"pages#home\" # TODO add as: :www_root"
   no_match:
+    # a root with its own name does not register :root
+    - "  root to: \"accounts#show\", constraints: SubdomainConstraint, as: :account_root"
+    - "  root :to => 'accounts#show', :as => :account_root"
     # a root_path helper call is not a declaration
     - "    redirect_to root_path"
     # a non-root route must not flag

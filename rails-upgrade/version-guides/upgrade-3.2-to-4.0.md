@@ -367,6 +367,42 @@ get '/home' => 'home#index'
 
 ---
 
+#### Duplicate Route Names Raise, Including a Second `root`
+
+**What Changed:**
+Rails 3.2's `RouteSet#add_route` overwrote an existing entry in `named_routes`, so an app
+could declare `root` once per constraints block and boot. Rails 4.0 raises instead:
+
+```
+ArgumentError: Invalid route name, already in use: 'root'
+```
+
+Every `root` without `as:` registers `:root`, so the second one in the same route set stops
+boot. A `root` inside `namespace :admin` registers `admin_root` and does not collide, and an
+engine's routes are a separate route set.
+
+**Detection Pattern:**
+```ruby
+root to: "pages#home", constraints: WwwConstraint
+root to: "accounts#show", constraints: SubdomainConstraint
+```
+
+**Fix:**
+```ruby
+# BEFORE
+root to: "pages#home", constraints: WwwConstraint
+root to: "accounts#show", constraints: SubdomainConstraint
+
+# AFTER: keep the first as :root so root_path / root_url keep working
+root to: "pages#home", constraints: WwwConstraint
+root to: "accounts#show", constraints: SubdomainConstraint, as: :account_root
+```
+
+`as:` on `root` works on 3.2 too, so no `NextRails.next?` branch is needed. Requests to
+`/` still go to the first root whose constraints match.
+
+---
+
 #### Remote Forms Stop Embedding the CSRF Token
 
 **What Changed:**
@@ -1404,6 +1440,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Scope returns wrong results or errors | "Scopes", under "Scopes and Association Options Require Lambda" — add lambda |
 | `Unknown key: :conditions` | "Association `:conditions` hash → lambda with `where()`", under "Scopes and Association Options Require Lambda" — move to lambda |
 | `No route matches` | "Routes Require HTTP Method" — add HTTP method |
+| `ArgumentError: Invalid route name, already in use: 'root'` | "Duplicate Route Names Raise, Including a Second `root`": add `as:` to the later roots |
 | Remote form POST arrives with no session or current user | "Remote Forms Stop Embedding the CSRF Token" — pin `embed_authenticity_token_in_remote_forms` |
 | `LoadError: cannot load such file -- sprockets/digest_utils` at boot | "terser Fails to Load on Sprockets 2.x": `require: false` on the next side |
 | `ArgumentError: The method .order() must contain arguments.` | "`order` and `reorder` Require Arguments" — name the column, `order(:id)` for `.order.last` |

@@ -289,12 +289,12 @@ upgrade_findings:
 
     - name: "Duplicate root route declarations across constraints"
       kind: "breaking"
-      pattern: "^\\s*root\\s+(to:|=>|['\"])"
-      exclude: ""
+      pattern: "^\\s*root\\s*\\(?\\s*(?:to:|:to\\s*=>|controller:|:controller\\s*=>|=>|['\"])"
+      exclude: ",\\s*(?:as:|:as\\s*=>)"
       search_paths:
         - "config/"
-      explanation: "Only actionable when the routes file has 2+ `root` declarations (typically one per constraint block); a single root is fine, so treat a lone hit as noise. Rails 4 raises `ArgumentError: Invalid route name, already in use: 'root'` on the second and later `root` declarations. Rails 3.2 was lenient about duplicate names with different constraints. Matches all three forms: `root to:`, `root =>`, and the Rails 4 string shorthand `root \"home#index\"`"
-      fix: "Keep the FIRST `root` declaration as the default `:root` name; add `as: :<unique_name>` to the SECOND and subsequent declarations. Renaming all of them (giving the first an `as:` too) silently breaks every `root_path` / `root_url` call site because the `:root` name is no longer registered. Real apps have dozens to hundreds of these helper calls. Verification step: `grep -rnE \"\\b(root_path|root_url)\\b\" app/ config/ lib/` and confirm no caller targets a constraint-bound root that was renamed"
+      explanation: "Rails 4.0's RouteSet#add_route raises `ArgumentError: Invalid route name, already in use: 'root'` when a route name is registered twice. Rails 3.2's add_route just overwrote the entry in named_routes, so an app could declare `root` once per constraints block (one per subdomain, say) and boot. Every `root` without `as:` registers the name `:root`, so the second one in the same route set now stops boot. Only a count of two or more matters: a lone root is fine, a root with `as:` has its own name and is excluded, and a root inside `namespace :admin` or `scope as: :admin` registers `admin_root`, which does not collide. Routes drawn by an engine (`Engine.routes.draw`) live in a separate route set. The pattern matches `root to:`, `root :to =>`, `root controller:`, the paren form and the string shorthand `root \"home#index\"`, one line at a time, so read the surrounding block before counting"
+      fix: "Keep the FIRST `root` declaration as the default `:root` name; add `as: :<unique_name>` to the SECOND and subsequent declarations (`as:` on root works on 3.2 too, so no NextRails.next? branch is needed). Renaming all of them (giving the first an `as:` too) silently breaks every `root_path` / `root_url` call site because the `:root` name is no longer registered. Request routing does not change: the first route whose constraints match still serves `/`. Verification step: `grep -rnE \"\\b(root_path|root_url)\\b\" app/ config/ lib/` and confirm no caller targets a constraint-bound root that was renamed"
       variable_name: "DUPLICATE_ROOT_ROUTES"
 
     - name: "Hyphenated or CamelCase controller name in routes to: value"
