@@ -52,8 +52,9 @@ DEPRECATED_FINDERS_AUTOREQUIRE:
     - "gem 'activerecord'"
 
 UPDATE_ALL_WITH_CONDITIONS:
-  # The multi-line shape (`update_all({\n a: 1\n}, {\n id: ids\n})`) is reached
-  # by the scanner, which matches file content; fixtures are single lines.
+  # The multi-line shape (`update_all({\n a: 1\n}, {\n id: ids\n})`) matches only
+  # in the whole-file scanner (detection-scripts/scan_patterns.rb); a line-based
+  # search sees single-line calls only. Fixtures are single lines.
   match:
     - "Item.update_all({ price: 0 }, { color: \"red\" })"
     - "Item.update_all(\"price = 0\", [\"color = ?\", color])"

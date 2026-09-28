@@ -241,7 +241,7 @@ Item.where("color = ?", color).update_all("price = 0")
 Item.order(:id).limit(5).update_all(price: 0)
 ```
 
-The chained form works on 3.2, 4.0 and 4.1, so it can ship before the bump. Calls split across several lines are the ones a hand review tends to miss; the detection pattern reaches them.
+The chained form works on 3.2, 4.0 and 4.1, so it can ship before the bump. Calls split across several lines are the ones a hand review tends to miss. The detection pattern matches them only when run by the whole-file pattern scanner; a line-based search such as `grep` sees single-line calls only.
 
 ---
 
