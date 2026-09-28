@@ -207,6 +207,39 @@ Delete the gem outright once the current Rails is 4.1.
 
 ---
 
+#### Scopes With a Non-Callable Body Removed
+
+**What Changed:**
+Rails 4.0 accepted `scope :name, <relation>` with a deprecation warning. Rails 4.1 removes that support: `scope` still defines the method, but every call runs `body.call`, so the first use of the scope raises on the stored relation:
+
+```
+NoMethodError: undefined method `call'
+```
+
+The error appears when the scope runs, not when the model loads, so the app boots and only the code paths that use the scope fail. The hash form (`scope :active, conditions: { ... }`) fails the same way unless `activerecord-deprecated_finders` is in the bundle. That gem rescues only the hash form, not a relation body.
+
+**Detection Pattern:**
+```ruby
+scope :active, where(active: true)
+scope :recent, order('created_at DESC')
+scope :published, :conditions => { published: true }
+```
+
+**Fix:**
+```ruby
+# BEFORE
+scope :active, where(active: true)
+scope :published, :conditions => { published: true }
+
+# AFTER
+scope :active, -> { where(active: true) }
+scope :published, -> { where(published: true) }
+```
+
+The lambda form works on Rails 4.0 too, so this can land before the version bump without a `NextRails.next?` branch.
+
+---
+
 ### 🟡 MEDIUM PRIORITY
 
 #### MultiJSON Removed from Rails
@@ -672,6 +705,7 @@ Cross-check against [RailsDiff 4.0.13 → 4.1.16](http://railsdiff.org/4.0.13/4.
 12. Pin JSON time precision if clients need it (`time_precision = 0`).
 13. Remove MultiJSON usage or add it back to the `Gemfile` explicitly.
 14. Migrate any `CacheDigests::*` call sites to `ActionView::Digestor` (the Gemfile gate in Phase 3 stops the rake abort; call sites still need rewriting).
+15. Wrap every non-callable `scope` body in a lambda (`scope :active, -> { where(active: true) }`).
 
 ### Phase 6: Testing
 - Run full test suite.
@@ -698,6 +732,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `I18n::InvalidLocale` on a request that worked on 4.0 | "I18n Enforces Available Locales" — add the locale to `config.i18n.available_locales` |
 | `TypeError: CacheDigests is not a class` from every `rake` task | "`cache_digests` Gem Collides with Core Cache Digests" — `gem 'cache_digests' unless NextRails.next?`, move `CacheDigests::*` calls to `ActionView::Digestor` |
 | API clients fail to parse `2024-01-01T00:00:00.000Z` | "`as_json` Millisecond Precision for Time/DateTime/TWZ" — `ActiveSupport::JSON::Encoding.time_precision = 0` or update consumers |
+| `NoMethodError: undefined method 'call'` when a scope runs | "Scopes With a Non-Callable Body Removed": wrap the body in `-> { ... }` |
 
 ---
 
