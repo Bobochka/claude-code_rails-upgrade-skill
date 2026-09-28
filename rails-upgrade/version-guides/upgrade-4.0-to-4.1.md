@@ -231,11 +231,15 @@ gem 'multi_json'
 # BEFORE
 MultiJson.dump(obj)
 MultiJson.load(str)
+MultiJson.load(str, symbolize_keys: true)
 
 # AFTER
 obj.to_json
 JSON.parse(str)
+JSON.parse(str, symbolize_names: true)
 ```
+
+`JSON.parse` does not know `symbolize_keys:`. Passing it does nothing and the keys come back as strings, so rename the option to `symbolize_names:`.
 
 **Do not** blindly substitute `JSON.dump` / `JSON.load` — those are the `JSON` gem's arbitrary-object (de)serializers and are unsafe on untrusted input.
 

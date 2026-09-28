@@ -92,7 +92,7 @@ upgrade_findings:
         - "lib/"
         - "config/"
       explanation: "Rails 4.1 no longer depends on the multi_json gem. Apps that reference its MultiJson constant directly will hit NameError once Rails stops pulling it in transitively. Gemfile is intentionally excluded — `gem 'multi_json'` IS the fix, not a breaking-change signal"
-      fix: "Either keep gem 'multi_json' in the Gemfile, or migrate callers to core JSON: obj.to_json and JSON.parse(str). Do NOT blindly replace with JSON.dump/JSON.load — those are unsafe for arbitrary objects"
+      fix: "Either keep gem 'multi_json' in the Gemfile, or migrate callers to core JSON: obj.to_json and JSON.parse(str). MultiJson.load(str, symbolize_keys: true) becomes JSON.parse(str, symbolize_names: true); JSON.parse ignores symbolize_keys: and returns string keys. Do NOT blindly replace with JSON.dump/JSON.load — those are unsafe for arbitrary objects"
       variable_name: "MULTI_JSON"
 
     - name: "ActiveRecord::Relation mutator calls"
