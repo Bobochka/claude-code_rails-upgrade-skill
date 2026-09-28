@@ -44,6 +44,8 @@ DEPRECATED_FINDERS_AUTOREQUIRE:
     - "gem \"activerecord-deprecated_finders\", \"~> 1.0.4\""
     - "  gem 'activerecord-deprecated_finders', require: false"
     - "  gem 'activerecord-deprecated_finders', :require => false"
+    - "gem 'activerecord-deprecated_finders', require: 'activerecord-deprecated_finders'"
+    - "gem 'activerecord-deprecated_finders', \"1.0.4\" # require: 'active_record/deprecated_finders' later"
   no_match:
     - "gem 'activerecord-deprecated_finders', require: 'active_record/deprecated_finders'"
     - "gem \"activerecord-deprecated_finders\", \"~> 1.0.4\", require: \"active_record/deprecated_finders\""
@@ -88,6 +90,8 @@ CALCULATE_FINDER_OPTIONS:
     - "Item.count(select: \"DISTINCT items.owner_id\")"
     - "Item.average(:price, :include => :owner)"
     - "Item.calculate(:sum, :price, having: \"SUM(price) > 10\")"
+    - "Item.count(:all, group: :color)"
+    - "Item.sum(\"price\", :limit => 5)"
   no_match:
     - "Item.where(color: \"red\").count"
     - "Item.group(:color).maximum(:price)"
@@ -97,6 +101,10 @@ CALCULATE_FINDER_OPTIONS:
     - "Item.count(:group_id)"
     - "Item.maximum(:price, sub_group: :color)"
     - "[1, 2, 3].sum"
+    # Service objects that take keyword arguments with the same names.
+    - "TaxCalculator.calculate(order: order)"
+    - "Shipping.calculate(from: origin, to: dest)"
+    - "Stats.count(limit: 10)"
 
 DISTINCT_COUNT_OPTION:
   # A call split across lines (`count(:owner_id,\n  distinct: true)`) matches
