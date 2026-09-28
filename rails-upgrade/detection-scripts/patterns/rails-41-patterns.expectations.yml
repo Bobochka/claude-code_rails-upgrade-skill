@@ -24,3 +24,24 @@ CACHE_DIGESTS_BACKPORT:
     - "  ActionView::Digestor.digest(name: name, finder: lookup_context)"
     - "  config.action_view.cache_template_loading = true"
     - "  <% cache [@post, 'v3'] do %>"
+
+# The pattern also spans up to four lines (a helper call whose confirm: sits on
+# a continuation line). Fixtures are per line, so that multi-line shape is
+# covered by the scanner, not by these fixtures. A bare `confirm:` line on its
+# own is a no_match here for the same reason.
+CONFIRM_OPTION:
+  match:
+    - "<%= link_to \"Delete\", post_path(@post), method: :delete, confirm: \"Are you sure?\" %>"
+    - "= link_to 'Remove', item_path(item), :confirm => 'Really remove?', :method => :delete"
+    - "<%= button_to \"Destroy\", @post, method: :delete, confirm: t(\"posts.confirm_destroy\") %>"
+    - "<%= submit_tag \"Save\", confirm: \"Save changes?\" %>"
+    - "<%= f.submit \"Publish\", :confirm => \"Publish now?\" %>"
+    - "<%= image_submit_tag \"go.png\", confirm: \"Continue?\" %>"
+  no_match:
+    - "<%= link_to \"Delete\", post_path(@post), method: :delete, data: { confirm: \"Are you sure?\" } %>"
+    - "= link_to 'Remove', item_path(item), :data => { :confirm => 'Really remove?' }, :method => :delete"
+    - "<%= button_to \"Destroy\", @post, \"data-confirm\" => \"Sure?\" %>"
+    - "<%= link_to \"Confirm email\", confirm_email_path(token: @token) %>"
+    - "<%= f.submit \"Save\", data: { disable_with: \"Saving...\", confirm: \"Save?\" } %>"
+    - "      confirm: \"Are you sure?\","
+    - "<%= f.password_field :password_confirmation %>"

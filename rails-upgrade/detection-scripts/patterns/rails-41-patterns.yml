@@ -82,6 +82,17 @@ upgrade_findings:
       fix: "Gate the gem out of the 4.1 bundle rather than delete it while the current bundle is still 4.0 and depends on it: `gem 'cache_digests' unless NextRails.next?`. Then confirm no first-party code calls the gem API, because core's is not call-compatible: CacheDigests::TemplateDigestor.digest(name, format, finder, options) (positional) became ActionView::Digestor.digest(name:, finder:, dependencies:, partial:) (single options hash); cache_prefix and the swappable cache accessor are gone; the ['v3', 'key'] explicitly-versioned cache-key form is gone, leaving only skip_digest: true; view_cache_dependency survives unchanged in ActionView::Helpers::CacheHelper. Core's ERB dependency tracker also detects more dependencies than the gem's (it parses layout: keys and method chains), so fragment digests can shift — that is a cold fragment cache on first deploy, not an error. A hit in Gemfile.lock with nothing in the Gemfile means another gem pulls cache_digests in transitively — run `bundle why cache_digests` and gate or upgrade that parent gem instead. Delete cache_digests outright once the current Rails is 4.1"
       variable_name: "CACHE_DIGESTS_BACKPORT"
 
+    - name: ":confirm option on link_to / button_to / submit helpers"
+      kind: breaking
+      pattern: "(link_to|button_to|submit_tag|\\.submit)(?:[^\\n]*\\n){0,4}?[^\\n]*?(:confirm\\s*=>|\\bconfirm:)"
+      exclude: "data:\\s*\\{[^}]*confirm|:data\\s*=>\\s*\\{[^}]*confirm|data-confirm"
+      search_paths:
+        - "app/"
+        - "lib/"
+      explanation: "Rails 4.0 deprecated the :confirm option on link_to, button_to, submit_tag, image_submit_tag and the form builder's submit, and turned it into a data-confirm attribute. Rails 4.1 removed that handling, so the option is no longer special: the helper renders it as a plain confirm=\"...\" HTML attribute. The UJS driver only reads data-confirm, so the confirmation dialog stops appearing and the link or button acts on the first click. Nothing raises and nothing is logged, and a destructive action loses its guard. Matches both the :confirm => and the confirm: spellings. The pattern spans up to four lines so it also finds a confirm: that sits on a continuation line of a multi-line helper call; an options hash spread wider than that is missed, so skim views for a bare confirm: as well. Lines already using data: { confirm: ... } or data-confirm are excluded"
+      fix: "Move the option under data: `confirm: \"Are you sure?\"` becomes `data: { confirm: \"Are you sure?\" }` (hash rocket form: `:data => { :confirm => \"Are you sure?\" }`). The data: form renders the same data-confirm attribute on 4.0 and 4.1, so the rewrite needs no NextRails.next? branch and can land before the bump. Keep the message argument as written, including an I18n.t(...) call. If the helper already has a data: hash, add confirm: to it rather than passing a second data: key"
+      variable_name: "CONFIRM_OPTION"
+
   medium_priority:
     - name: "MultiJSON usage"
       kind: breaking
