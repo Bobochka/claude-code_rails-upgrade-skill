@@ -224,24 +224,35 @@ has_many :items, -> { order('position ASC') }
 has_one :user, -> { order('id DESC') }
 ```
 
-##### Association `:extend` → `extending` inside lambda
+##### `belongs_to` / `has_one` `:extend` → `extending` inside lambda
+
+Rails 4.0 keeps `:extend` on `has_many` and `has_and_belongs_to_many`, where it still
+works with no warning. On `belongs_to` and `has_one` it is gone, and the declaration
+raises `ArgumentError: Unknown key: extend` while the model loads.
+activerecord-deprecated_finders does not bring it back.
 
 **Detection Pattern:**
 ```ruby
-has_many :items, :extend => SomeExtension
 belongs_to :item, foreign_key: :content_id, extend: ContentExtension
+has_one :profile, :extend => ProfileMethods
 ```
 
 **Fix:**
 ```ruby
 # BEFORE
-has_many :items, :extend => SomeExtension
 belongs_to :item, foreign_key: :content_id, extend: ContentExtension
 
 # AFTER
-has_many :items, -> { extending SomeExtension }
-belongs_to :item, -> { extending ContentExtension }, foreign_key: :content_id
+if NextRails.next?
+  belongs_to :item, -> { extending(ContentExtension) }, foreign_key: :content_id
+else
+  belongs_to :item, foreign_key: :content_id, extend: ContentExtension
+end
 ```
+
+The branch is needed because Rails 3.2 does not accept a scope lambda as the second
+argument of an association macro (`ArgumentError: wrong number of arguments (given 3,
+expected 1..2)`). `has_many :items, extend: SomeExtension` can stay as it is.
 
 ##### Combined `:conditions` + `:order` + `:extend` → single lambda
 
@@ -1219,6 +1230,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | `ActiveModel::ForbiddenAttributesError` | "Strong Parameters (Replaces attr_accessible)" — use `user_params` not `params[:user]` |
 | Scope returns wrong results or errors | "Scopes", under "Scopes and Association Options Require Lambda" — add lambda |
 | `Unknown key: :conditions` | "Association `:conditions` hash → lambda with `where()`", under "Scopes and Association Options Require Lambda" — move to lambda |
+| `ArgumentError: Unknown key: extend` | "`belongs_to` / `has_one` `:extend` → `extending` inside lambda", under "Scopes and Association Options Require Lambda": move the module into `extending` |
 | `No route matches` | "Routes Require HTTP Method" — add HTTP method |
 | `ArgumentError: The provided regular expression is using multiline anchors (^ or $)` | "Format Validators Reject Multiline Anchors": use `\A` and `\z` |
 | Remote form POST arrives with no session or current user | "Remote Forms Stop Embedding the CSRF Token" — pin `embed_authenticity_token_in_remote_forms` |
