@@ -6,6 +6,7 @@ on:
     paths:
       - "rails-upgrade/**/*.md"
       - "rails-upgrade/detection-scripts/patterns/*.yml"
+      - "rails-upgrade/detection-scripts/*.rb"
       - "upgrade-cleanup/**/*.md"
       - "bin/validate-patterns"
       - "bin/test-patterns"
@@ -15,6 +16,7 @@ on:
     paths:
       - "rails-upgrade/**/*.md"
       - "rails-upgrade/detection-scripts/patterns/*.yml"
+      - "rails-upgrade/detection-scripts/*.rb"
       - "upgrade-cleanup/**/*.md"
       - "bin/validate-patterns"
       - "bin/test-patterns"
@@ -37,3 +39,4 @@ jobs:
       - run: ruby bin/test-patterns
       - run: ruby bin/test-patterns --self-test
       - run: ruby bin/lint-skill
+      - run: ruby rails-upgrade/detection-scripts/scan_patterns.rb --self-test

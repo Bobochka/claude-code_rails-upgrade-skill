@@ -115,6 +115,7 @@ When proposing code fixes that must work with both the current and target Rails 
 
 ### Detection Pattern Resources
 - `detection-scripts/patterns/rails-*.yml` - Version-specific patterns for direct detection
+- `detection-scripts/scan_patterns.rb` - Runs every pattern for a hop against the app and prints a findings table. Run it in Workflow 05 instead of one Grep per pattern.
 
 ### Report Templates
 - `templates/upgrade-report-template.md` - Main upgrade report structure
@@ -149,7 +150,7 @@ The Purpose column is a summary. Gates live only in each workflow's `## Gates` s
 
 ## Key Principles
 
-1. **Run Detection Directly** (use Grep/Glob/Read tools - no script generation needed)
+1. **Run Detection Directly** (run `detection-scripts/scan_patterns.rb`, then Read the affected files; never generate a detection script for the user to run)
 2. **Load Workflows as Needed** (don't hold everything in memory)
 3. **Follow FastRuby.io Methodology** (incremental upgrades, assessment first)
 

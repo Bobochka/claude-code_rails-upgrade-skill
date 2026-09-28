@@ -18,6 +18,11 @@ This file captures project-specific conventions Claude should follow when workin
   - Expectations are keyed by `variable_name` and list `match` (lines the pattern MUST flag) and `no_match` (lines it MUST NOT flag) — see the worked example in `rails-40-patterns.expectations.yml`
   - Exits 0 on success, 1 on any failure with a per-pattern error report
 
+- `rails-upgrade/detection-scripts/scan_patterns.rb` is the scanner the skill runs inside the user's app in Workflow 05. It runs every pattern of one hop and prints a markdown findings table (or `--format json`). It ships inside the skill, so it runs with the app's Ruby: keep it stdlib only and Ruby 2.1 compatible (no `&.`, no `<<~`, no `String#match?`, no `Array#sum`, no `Dir.children`).
+  - `ruby rails-upgrade/detection-scripts/scan_patterns.rb --root path/to/app` scans the hop after the app's `Gemfile.lock` Rails version; `--target X.Y` picks the hop
+  - `ruby rails-upgrade/detection-scripts/scan_patterns.rb --self-test` runs built-in assertions and loads every patterns file. CI runs it
+  - It matches file content, not single lines, so a pattern that crosses newlines (`[^)]*`, `\s*`) can report more sites than `bin/test-patterns` fixtures suggest. That is intended
+
 ## Workflows and references (`rails-upgrade/workflows/`, `rails-upgrade/references/`)
 
 The skill body follows the progressive-disclosure practice from the skill-creator skill and the [Agent Skills specification](https://agentskills.io/specification): `SKILL.md` is the short entry point, procedures live in `workflows/`, on-demand material lives in `references/`. Two kinds of file, named so a search hit shows which kind it is:
