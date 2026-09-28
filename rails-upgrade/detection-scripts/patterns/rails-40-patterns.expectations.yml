@@ -465,6 +465,23 @@ VALIDATES_AS_PARANOID:
     # commented-out call is inert
     - '  # validates_as_paranoid'
 
+JS_COMPRESSOR_GEM_MISMATCH:
+  # Pattern: a Gemfile line declaring terser; `require: false` is the fixed state.
+  match:
+    - 'gem "terser"'
+    - "  gem 'terser', '~> 1.2'"
+    # a trailing comment does not count as the fix
+    - '  gem "terser" # needs require: false on the next side'
+  no_match:
+    # the fixed next-side declaration, both hash syntaxes
+    - '    gem "terser", require: false'
+    - "    gem 'terser', :require => false"
+    # uglifier and closure-compiler do not load sprockets/digest_utils
+    - '  gem "uglifier", ">= 1.3.0"'
+    - '  gem "closure-compiler"'
+    # a commented-out declaration
+    - '# gem "terser"'
+
 COLLECTION_PROXY_ENUMERABLE_GUARD:
   # Pattern: "(?:is_a\\?|kind_of\\?)\\s*\\(?\\s*Enumerable\\b"
   # is_a?/kind_of? Enumerable guard, with or without parens; \b avoids Enumerable-prefixed names.
