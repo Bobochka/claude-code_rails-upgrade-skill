@@ -1,6 +1,6 @@
 # Workflow 05: Detect Breaking Changes
 
-**Purpose:** Run breaking change detection directly using Claude's tools (Grep, Glob, Read)
+**Purpose:** Run every detection pattern for the hop with `detection-scripts/scan_patterns.rb`, then read the affected files with Claude's tools (Read, Grep, Glob)
 
 **When to use:** Workflow 05 of the upgrade workflow — after tests pass and the upgrade path is validated. (load_defaults alignment is Workflow 12, *after* detection, not before.)
 
@@ -15,18 +15,8 @@
 
 ## Gates (must be true before the next workflow that runs)
 
-- Every pattern in the patterns file searched with the Grep tool
-
----
-
-## Why Direct Detection?
-
-Claude Code can:
-- Search files directly using the Grep tool
-- Find files by pattern using the Glob tool
-- Read file contents using the Read tool
-- Analyze results immediately
-- Generate reports without user round-trip
+- Every pattern in the patterns file searched: by `detection-scripts/scan_patterns.rb`, or by hand with the Grep tool when the script cannot run
+- Every UNSCANNED entry the script reports is either confirmed absent from this app or searched by hand
 
 ---
 
@@ -93,49 +83,37 @@ This makes the cascade explicit in the report — readers see "bump rspec-rails 
 
 ---
 
-### Step 2: Process High Priority Patterns
+### Step 2: Run the Scanner
 
-For each pattern in `upgrade_findings.high_priority`:
+From the app root, run the scanner with the app's Ruby (it is stdlib only and runs on Ruby 2.1 and later, so no Bundler is needed):
 
-```yaml
-- name: "Sprockets usage"
-  pattern: "sprockets|Sprockets"
-  exclude: "propshaft"
-  search_paths:
-    - "Gemfile"
-    - "config/"
-    - "app/assets/"
-  explanation: "Rails 8.0 replaces Sprockets with Propshaft"
-  fix: "Migrate to Propshaft or keep Sprockets explicitly"
+```bash
+ruby <skill>/detection-scripts/scan_patterns.rb > tmp/pattern-scan.md
 ```
 
-**Execute using Grep tool:**
+`<skill>` is this skill's directory, the one holding `SKILL.md`. With no arguments the script reads the current Rails version from `Gemfile.lock` and scans with the next patterns file (4.0 -> 4.1, 6.0 -> 7.0). Pass `--target X.Y` when the hop is different, for example when `Gemfile.lock` is still on the previous version during a dual-boot or when planning a later hop of a multi-hop plan.
 
-```
-Grep:
-  pattern: "sprockets|Sprockets"
-  path: "Gemfile"
-  output_mode: "content"
-```
+The output is markdown:
 
-```
-Grep:
-  pattern: "sprockets|Sprockets"
-  path: "config/"
-  output_mode: "content"
-```
+- a **Summary** table, one row per pattern that matched, with bucket, priority, kind, sites and files, already ordered the way Step 4 groups findings;
+- one section per matched pattern with its `fix:` and a `file:line | code` table;
+- **Scanned clean**: patterns whose search_paths had files and no match;
+- **Suppressed by exclude**: sites the pattern matched that `exclude:` dropped;
+- **UNSCANNED**: patterns whose search_paths resolved to no files in this app.
 
-**Collect results:**
-- File paths where pattern was found
-- Line numbers
-- Matching content
-- Context (lines before/after if helpful)
+Useful flags: `--summary` prints only the summary and the status lists (for a first look at a large app), `--format json` prints one object per pattern with its bucket, status (`found` / `clean` / `unscanned`) and sites, `--show-suppressed` lists every suppressed site.
+
+The scanner matches against file content, so a call split across lines is found when the pattern is written to cross newlines. It also searches Packwerk packs, engines and components (`app/models/` also reaches `packs/*/app/models/`) and skips `node_modules`, `vendor`, `tmp` and `log` unless a search_path names them.
+
+If Ruby cannot run in the app's environment at all, fall back to the Grep tool: for every pattern in `upgrade_findings.high_priority`, `medium_priority` and `low_priority`, run one Grep per search_path with `output_mode: "content"` and `-n: true`, then drop lines that match `exclude:`. Grep is line-based, so its counts are a floor for patterns that span lines.
 
 ---
 
-### Step 3: Process Medium and Low Priority Patterns
+### Step 3: Check What the Scanner Could Not See
 
-Same process for `upgrade_findings.medium_priority` and `upgrade_findings.low_priority` patterns.
+- **UNSCANNED** is "could not scan", not "clean". For each one, confirm the path does not exist in this app (a Gemfile-only pattern in an app without that file) or Grep the app's real layout by hand.
+- **Suppressed by exclude**: `exclude:` is tested on the lines a match spans, so a real hit that shares a line with the excluded form is dropped with it. Re-run with `--show-suppressed` when the count is non-zero and look at any entry whose excluded form can sit next to a real hit.
+- **False positives**: a pattern flags text, not behavior. Read the matched line before carrying a site into the report (Step 5), and drop sites that are not the API the pattern describes (a method that only shares a name prefix, a comment, a string).
 
 ---
 
@@ -220,7 +198,7 @@ Pass structured findings to the report generation step.
 
 ---
 
-## Tool Usage Examples
+## Tool Usage Examples (Grep fallback and Step 5)
 
 ### Using Grep for Pattern Search
 
@@ -386,7 +364,8 @@ After detection completes:
 
 ## Performance Considerations
 
-- Run Grep calls in parallel when possible (multiple tool calls in one message)
+- Run the scanner once per hop instead of one Grep call per pattern and path
+- When falling back to Grep, run the calls in parallel (multiple tool calls in one message)
 - Use specific paths rather than searching entire codebase
 - Limit context lines to what's needed
 - Don't read files unnecessarily - only read what's needed for reports
@@ -405,7 +384,8 @@ Before proceeding to report generation:
 - [ ] Within each bucket, sub-ordered by priority (HIGH → MEDIUM → LOW)
 - [ ] Each finding tagged with both its `kind` and `priority` in the output
 - [ ] Any search errors noted
-- [ ] Grep/Glob tools used correctly for each pattern
+- [ ] Scanner run for the right hop (or Grep used for every pattern when it could not run)
+- [ ] UNSCANNED entries confirmed absent or searched by hand
 - [ ] Context captured for each finding
 
 ---
