@@ -555,7 +555,7 @@ expect { Post.find(999) }.to raise_error(ActiveRecord::RecordNotFound)
 expect(json["error"]).to match(/Couldn't find Post with '?id'?=999/)
 ```
 
-The single-id check needs `=` right after the column name, so app-written messages with spaces around `=` are not flagged. An app-written message in exactly the Rails shape is flagged but does not change; skip it.
+The pattern matches `Couldn't` and `Couldn\'t`, so single-quoted strings are flagged too. The single-id check needs `=` right after the column name, so app-written messages with spaces around `=` are not flagged. An app-written message in exactly the Rails shape is flagged but does not change; skip it.
 
 ---
 

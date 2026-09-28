@@ -200,14 +200,14 @@ upgrade_findings:
 
     - name: "RecordNotFound message text asserted or passed on"
       kind: breaking
-      pattern: "Couldn't find [\\w:]+ with [a-z_]+=|Couldn't find all [\\w:]+ with IDs"
+      pattern: "Couldn\\\\?'t find [\\w:]+ with [a-z_]+=|Couldn\\\\?'t find all [\\w:]+ with IDs"
       exclude: ""
       search_paths:
         - "spec/"
         - "test/"
         - "app/"
         - "lib/"
-      explanation: "Rails 4.1 quotes the primary key in the ActiveRecord::RecordNotFound message: Post.find(999) raises \"Couldn't find Post with 'id'=999\" where 4.0 raised \"Couldn't find Post with id=999\", and the several-ids form changes from \"with IDs (1, 999)\" to \"with 'id': (1, 999)\" (relation/finder_methods.rb, raise_record_not_found_exception!). Specs that assert the message text fail. The single-id half needs `=` right after the column name, so app-written messages with spaces around `=` do not match. An app-written message in exactly the Rails shape does match, and does not change on upgrade. Also check app code that puts e.message into a response body: API clients get the quoted form after the upgrade"
+      explanation: "Rails 4.1 quotes the primary key in the ActiveRecord::RecordNotFound message: Post.find(999) raises \"Couldn't find Post with 'id'=999\" where 4.0 raised \"Couldn't find Post with id=999\", and the several-ids form changes from \"with IDs (1, 999)\" to \"with 'id': (1, 999)\" (relation/finder_methods.rb, raise_record_not_found_exception!). Specs that assert the message text fail. The apostrophe may be escaped (Couldn\\'t, as in a single-quoted Ruby string) or not. The single-id half needs `=` right after the column name, so app-written messages with spaces around `=` do not match. An app-written message in exactly the Rails shape does match, and does not change on upgrade. Also check app code that puts e.message into a response body: API clients get the quoted form after the upgrade"
       fix: "Assert on what the app controls instead of Rails wording: the exception class (raise_error(ActiveRecord::RecordNotFound)), the response status, and the id that was looked up. Where the response carries an app-written message, assert that instead. If a spec must keep checking the Rails text, match both forms, for example /Couldn't find Post with '?id'?=999/, and drop the old form once 4.0 is gone. If API clients parse the message, tell them about the new wording or return an app-owned message"
       variable_name: "RECORD_NOT_FOUND_MESSAGE"
 
