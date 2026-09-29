@@ -171,6 +171,18 @@ ROUTE_SCOPE_POSITIONAL_SYMBOL:
     - "  scope :reports"
     # a path: that only starts with the symbol is still overwritten by it
     - "  scope :docs, path: \"docs/v1\" do"
+    # path: names a different segment that shares a prefix with the symbol
+    - "  scope :docs, path: \"doc\" do"
+    - "  scope :doc, path: :docs do"
+    # a second positional argument joins the path on 4.0 only
+    - "  scope :a, :b, path: \"a\" do"
+    - "  scope \"a\", \"b\" do"
+    # the path: belongs to a route inside the block, not to the scope
+    - "  scope :docs do resources :items, path: \"docs\" end"
+    - "  scope :\"foo-bar\" do"
+    - "  scope [:a, :b] do"
+    - "  scope %i[a b] do"
+    - "  constraints(subdomain: \"api\") { scope :v1 do"
   no_match:
     # the same segment as path: — a no-op on both versions
     - "  scope :docs, controller: \"docs\", path: \"docs\" do"
@@ -187,6 +199,8 @@ ROUTE_SCOPE_POSITIONAL_SYMBOL:
     - "  scope \"(:locale)\", locale: /en|de/ do"
     # not a scope call
     - "  resources :reports, only: :index"
+    - "  # scope :reports do"
+    - "  has_many :items, -> { where(active: true) }, scope: :active"
 
 WHINY_NILS:
   match:

@@ -383,11 +383,17 @@ path segment and overwrites an explicit `path:`. Nothing raises: the old URL ret
 | `scope :docs, path: "docs" do ... end` | `/docs/...` | `/docs/...` |
 | `scope "legacy" do ... end`, `scope path: "kw" do ... end` | unchanged | unchanged |
 
+An Array or a second positional argument (`scope [:a, :b]`, `scope "a", "b"`) changes the same
+way. One exception to "unchanged": from 4.0.4 on, a `scope` outside a resource block also copies
+its `path:` into `shallow_path`, so the member routes of `shallow: true` resources inside it gain
+that prefix, which 3.2 never added.
+
 **Detection Pattern:**
 ```bash
-grep -rnE "^\s*scope\s*\(?\s*:\w+\s*(,|\)|\{|do\b|$)" config/routes.rb config/routes/
+grep -rnE "scope\s*\(?\s*(:[\"a-z_]|\[|%[iIwW])" config/routes.rb config/routes/
 ```
-A hit whose `path:` names the same segment as the Symbol is a no-op on both versions.
+Skip keyword-only hits (`scope :path => ...`, `scope :module => ...`). A lone Symbol whose own
+`path:` names the same segment is a no-op on both versions.
 
 **Fix:**
 ```ruby
@@ -414,8 +420,10 @@ namespace :api do
 end
 ```
 
-Keep the Symbol only if the new segment is the URL you want, and treat that as a URL change for
-every client. Adding `as:` in its place also renames the route helpers.
+If the block holds `shallow: true` resources under a `path:` other than `"/"`, compare their
+member routes in `rake routes` on both versions before relying on one fix for both. Keep the
+Symbol only if the new segment is the URL you want, and treat that as a URL change for every
+client. Adding `as:` in its place also renames the route helpers.
 
 ---
 
