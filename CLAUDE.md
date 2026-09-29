@@ -7,16 +7,16 @@ This file captures project-specific conventions Claude should follow when workin
 - `bin/validate-patterns` validates every detection pattern YAML file under `rails-upgrade/detection-scripts/patterns/`. Run it before committing any change to a pattern file. Pure-stdlib Ruby, no Bundler or Gemfile required.
   - `bin/validate-patterns` validates every file
   - `bin/validate-patterns path/to/file.yml` validates one or more specific files
-  - `bin/validate-patterns --self-test` runs built-in fixture assertions covering the four positive `kind:` values and the four rejection paths (missing top-level key, missing required pattern key, broken regex, unknown `kind:` value). CI runs this alongside the file-validation step
-  - Checks: YAML parses, required top-level keys present, the eight required pattern keys present on each entry, every `pattern` / `exclude` regex compiles, and the `kind:` value is one of the allowed enum values (`breaking`, `deprecation`, `migration`, `optional`)
-  - Exits 0 on success, 1 on any failure with a per-file error report
+  - `bin/validate-patterns --self-test` runs built-in fixture assertions covering the four positive `kind:` values and the rejection paths (missing top-level key, missing required pattern key, broken regex, unknown `kind:` value, a control character from a single-backslash YAML escape, catastrophic backtracking). CI runs this alongside the file-validation step
+  - Checks: YAML parses, required top-level keys present, the eight required pattern keys present on each entry, every `pattern` / `exclude` regex compiles, contains no control characters (in a double-quoted YAML string `"\b"` is a backspace; the word boundary is `"\\b"`), and finishes within 0.5s on long stress inputs (Ruby 3.2+, which has Regexp timeouts), and the `kind:` value is one of the allowed enum values (`breaking`, `deprecation`, `migration`, `optional`)
+  - Exits 0 on success, 1 on any failure with a per-file error report. Every error line ends with a `hint:` saying how to fix it
 
 - `bin/test-patterns` runs fixture tests for a pattern file against its sibling `*.expectations.yml` (e.g. `rails-40-patterns.yml` + `rails-40-patterns.expectations.yml`). It confirms a pattern's regex actually matches what its explanation claims and skips what it shouldn't — `validate-patterns` only confirms the regex compiles, not that it's correct. Pure-stdlib Ruby, same shape as `bin/validate-patterns`.
   - `bin/test-patterns` tests every pattern file that has an expectations sibling; files without one are reported `SKIP`, not a failure
   - `bin/test-patterns path/to/file.yml` tests one or more specific files
   - `bin/test-patterns --self-test` runs built-in fixture assertions. CI runs this alongside the fixture-test step
   - Expectations are keyed by `variable_name` and list `match` (lines the pattern MUST flag) and `no_match` (lines it MUST NOT flag) — see the worked example in `rails-40-patterns.expectations.yml`
-  - Exits 0 on success, 1 on any failure with a per-pattern error report
+  - Exits 0 on success, 1 on any failure with a per-pattern error report. Each failure carries a `hint:`: for a missed match it says whether the pattern or the `exclude:` dropped the line
 
 - `rails-upgrade/detection-scripts/scan_patterns.rb` is the scanner the skill runs inside the user's app in Workflow 05. It runs every pattern of one hop and prints a markdown findings table (or `--format json`). It ships inside the skill, so it runs with the app's Ruby: keep it stdlib only and Ruby 2.1 compatible (no `&.`, no `<<~`, no `String#match?`, no `Array#sum`, no `Dir.children`).
   - `ruby rails-upgrade/detection-scripts/scan_patterns.rb --root path/to/app` scans the hop after the app's `Gemfile.lock` Rails version; `--target X.Y` picks the hop

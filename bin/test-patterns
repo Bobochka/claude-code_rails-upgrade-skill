@@ -67,6 +67,22 @@ def flagged?(line, entry)
   !Regexp.new(exclude).match?(line)
 end
 
+FALSE_FLAG_HINT = "hint: tighten the pattern (a boundary that also stops at ? and !, a (?<!def ) guard, " \
+                  "a lookbehind for the receiver) or add an exclude:. scan_patterns.rb tests exclude: against every " \
+                  "line a match spans, so anchor it with \\A to look at the first line only"
+
+# Says whether the pattern or the exclude dropped a line that should have been
+# flagged, since the fix differs.
+def miss_hint(line, entry)
+  if entry["pattern"].to_s.empty?
+    "hint: the pattern is empty (path-based detection), so no line can ever match; remove the match expectation"
+  elsif Regexp.new(entry["pattern"].to_s).match?(line)
+    "hint: the pattern matches but exclude: #{entry["exclude"].inspect} drops the line; narrow the exclude"
+  else
+    "hint: the pattern itself does not match; try it with: ruby -e 'p Regexp.new(ARGV[0]).match(ARGV[1])' '<pattern>' '<line>'"
+  end
+end
+
 def expectations_path_for(pattern_path)
   pattern_path.sub(/\.yml\z/, ".expectations.yml")
 end
@@ -80,7 +96,8 @@ def run_expectations(index, exp_doc)
   exp_doc.each do |var, spec|
     entry = index[var]
     unless entry
-      failures << "#{var}: no pattern with this variable_name in the pattern file"
+      failures << "#{var}: no pattern with this variable_name in the pattern file; " \
+                  "hint: rename the key to the entry's variable_name, or delete the stale expectation"
       next
     end
 
@@ -88,12 +105,12 @@ def run_expectations(index, exp_doc)
 
     Array(spec["match"]).each do |line|
       checked += 1
-      failures << "#{var}: expected to MATCH but did not: #{line.inspect}" unless flagged?(line, entry)
+      failures << "#{var}: expected to MATCH but did not: #{line.inspect}; #{miss_hint(line, entry)}" unless flagged?(line, entry)
     end
 
     Array(spec["no_match"]).each do |line|
       checked += 1
-      failures << "#{var}: expected NO match but it flagged: #{line.inspect}" if flagged?(line, entry)
+      failures << "#{var}: expected NO match but it flagged: #{line.inspect}; #{FALSE_FLAG_HINT}" if flagged?(line, entry)
     end
   end
 
@@ -110,7 +127,8 @@ def test_file(pattern_path)
     pattern_doc = YAML.safe_load_file(pattern_path)
     exp_doc = YAML.safe_load_file(exp_path)
   rescue Psych::SyntaxError => e
-    return [:fail, "YAML parse error: #{e.message}"]
+    return [:fail, "YAML parse error: #{e.message}; hint: double every regex backslash inside double-quoted YAML, " \
+                   "then run bin/validate-patterns on the pattern file"]
   end
 
   return [:fail, "expectations file is not a Hash"] unless exp_doc.is_a?(Hash)
