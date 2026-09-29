@@ -161,6 +161,33 @@ MATCH_WITHOUT_VIA:
     # not a `match` route at all
     - "  get '/users', to: 'users#index'"
 
+ROUTE_SCOPE_POSITIONAL_SYMBOL:
+  match:
+    - "  scope :reports, controller: \"reports\" do"
+    - "    scope :meta, controller: \"meta\", path: \"/\" do"
+    - "  scope :reports, :controller => \"reports\" do"
+    - "  scope(:reports) do"
+    - "  scope :reports do"
+    - "  scope :reports"
+    # a path: that only starts with the symbol is still overwritten by it
+    - "  scope :docs, path: \"docs/v1\" do"
+  no_match:
+    # the same segment as path: — a no-op on both versions
+    - "  scope :docs, controller: \"docs\", path: \"docs\" do"
+    - "  scope :docs, path: \"/docs\" do"
+    - "  scope :help, controller: :help, path: :help do"
+    - "  scope :docs, :path => \"docs\" do"
+    # keyword-only calls, both hash syntaxes
+    - "  scope path: \"admin\", controller: \"admin\" do"
+    - "  scope module: \"admin\" do"
+    - "  scope :path => \"admin\", :module => \"admin\" do"
+    - "  scope :module => \"admin\" do"
+    # a String first argument is the path on both versions
+    - "  scope \"legacy\", controller: \"legacy\" do"
+    - "  scope \"(:locale)\", locale: /en|de/ do"
+    # not a scope call
+    - "  resources :reports, only: :index"
+
 WHINY_NILS:
   match:
     - "  config.whiny_nils = true"

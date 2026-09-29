@@ -367,6 +367,58 @@ get '/home' => 'home#index'
 
 ---
 
+#### A Symbol Passed to Route `scope` Becomes a Path Segment
+
+**What Changed:**
+Rails 3.2's `Mapper#scope` used its first positional argument as the path only when it was a
+String, so a Symbol added nothing to the URL and an explicit `path:` survived. Rails 4.0 joins
+every positional argument into `options[:path]` before merging the options, so a Symbol becomes a
+path segment and overwrites an explicit `path:`. Nothing raises: the old URL returns 404 and
+`rake routes` lists the new one. Drawing the same routes on actionpack 3.2.22.5 and 4.0.13 gives:
+
+| Route | 3.2 | 4.0 |
+|-------|-----|-----|
+| `scope :reports, controller: "reports" do post "export" end` | `/export` | `/reports/export` |
+| `namespace :api do scope :meta, controller: "meta", path: "/" do get "status" end end` | `/api/status` | `/api/meta/status` |
+| `scope :docs, path: "docs" do ... end` | `/docs/...` | `/docs/...` |
+| `scope "legacy" do ... end`, `scope path: "kw" do ... end` | unchanged | unchanged |
+
+**Detection Pattern:**
+```bash
+grep -rnE "^\s*scope\s*\(?\s*:\w+\s*(,|\)|\{|do\b|$)" config/routes.rb config/routes/
+```
+A hit whose `path:` names the same segment as the Symbol is a no-op on both versions.
+
+**Fix:**
+```ruby
+# BEFORE
+scope :reports, controller: "reports" do
+  post "export"
+end
+
+namespace :api do
+  scope :meta, controller: "meta", path: "/" do
+    get "status"
+  end
+end
+
+# AFTER - same URLs on 3.2 and 4.0, no NextRails.next? branch needed
+scope controller: "reports" do
+  post "export"
+end
+
+namespace :api do
+  scope controller: "meta", path: "/" do
+    get "status"
+  end
+end
+```
+
+Keep the Symbol only if the new segment is the URL you want, and treat that as a URL change for
+every client. Adding `as:` in its place also renames the route helpers.
+
+---
+
 #### Remote Forms Stop Embedding the CSRF Token
 
 **What Changed:**
@@ -1172,6 +1224,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Scope returns wrong results or errors | "Scopes", under "Scopes and Association Options Require Lambda" — add lambda |
 | `Unknown key: :conditions` | "Association `:conditions` hash → lambda with `where()`", under "Scopes and Association Options Require Lambda" — move to lambda |
 | `No route matches` | "Routes Require HTTP Method" — add HTTP method |
+| A scoped route 404s and `rake routes` shows an extra segment | "A Symbol Passed to Route `scope` Becomes a Path Segment" — drop the Symbol, keep `path:` |
 | Remote form POST arrives with no session or current user | "Remote Forms Stop Embedding the CSRF Token" — pin `embed_authenticity_token_in_remote_forms` |
 | `ArgumentError: The method .order() must contain arguments.` | "`order` and `reorder` Require Arguments" — name the column, `order(:id)` for `.order.last` |
 | `ArgumentError: Direction should be :asc or :desc` | "`order` and `reorder` Require Arguments" — hash values must be `:asc` / `:desc`; use strings across joins |
