@@ -74,7 +74,9 @@ FALSE_FLAG_HINT = "hint: tighten the pattern (a boundary that also stops at ? an
 # Says whether the pattern or the exclude dropped a line that should have been
 # flagged, since the fix differs.
 def miss_hint(line, entry)
-  if Regexp.new(entry["pattern"].to_s).match?(line)
+  if entry["pattern"].to_s.empty?
+    "hint: the pattern is empty (path-based detection), so no line can ever match; remove the match expectation"
+  elsif Regexp.new(entry["pattern"].to_s).match?(line)
     "hint: the pattern matches but exclude: #{entry["exclude"].inspect} drops the line; narrow the exclude"
   else
     "hint: the pattern itself does not match; try it with: ruby -e 'p Regexp.new(ARGV[0]).match(ARGV[1])' '<pattern>' '<line>'"

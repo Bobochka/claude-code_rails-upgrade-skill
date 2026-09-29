@@ -41,7 +41,8 @@ STRESS_REPS = 400
 STRESS_LIMIT = 0.5 # seconds per match
 
 def stress_inputs(src)
-  words = src.scan(/[A-Za-z_]{3,}/).uniq.first(3)
+  # Drop regex escapes first, or `\blink_to` yields the word "blink_to".
+  words = src.gsub(/\\./, " ").scan(/[A-Za-z_]{3,}/).uniq.first(3)
   prefixes = [""] + words.map { |w| "#{w} x, " }
   openers = ["", "{", "(", "data: {"]
   bodies = ['#{a} #', "a ", ", ", "x,\n", "{ a: "]
@@ -194,7 +195,7 @@ def self_test
     # A draft CONFIRM_OPTION regex: `#` fits both branches of the repeated
     # hash body, so a long run of `#{a} #` backtracks.
     slow["upgrade_findings"]["high_priority"][0]["pattern"] =
-      '(link_to)(?:(?:\bdata:)\s*\{(?:[^{}]|#?\{[^{}]*\})*\}|(?!%>|(?:\bdata:)\s*\{)[^\n])*?' \
+      '\blink_to\b(?:(?:\bdata:)\s*\{(?:[^{}]|#?\{[^{}]*\})*\}|(?!%>|(?:\bdata:)\s*\{)[^\n])*?' \
       '(?:(?<=[,({])[ \t]*\n(?:(?:\bdata:)\s*\{(?:[^{}]|#?\{[^{}]*\})*\}|(?!%>|(?:\bdata:)\s*\{)[^\n])*?){0,4}?(\bconfirm:)'
     cases << { name: "catastrophic backtracking", doc: slow, expect: :fail, match: /did not finish in .*hint: a repeated group/ }
   end
