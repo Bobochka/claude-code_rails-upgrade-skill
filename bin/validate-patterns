@@ -8,6 +8,12 @@
 #   bin/validate-patterns path/to/file   # validate a specific file (one or more)
 #   bin/validate-patterns --self-test    # run built-in fixture assertions
 #
+# Checks: YAML parses, required keys, `kind:` enum, and every `pattern` /
+# `exclude` regex compiles, has no control characters (a single backslash in a
+# YAML double-quoted string, like "\b", becomes a backspace, not a word
+# boundary), and finishes in bounded time on long stress inputs (catastrophic
+# backtracking). Every error ends with a `hint:` on how to fix it.
+#
 # Exits 0 if all files / assertions pass, 1 otherwise.
 
 require "yaml"
@@ -19,19 +25,66 @@ PATTERN_KEYS = %w[name kind pattern exclude search_paths explanation fix variabl
 PRIORITY_KEYS = %w[high_priority medium_priority low_priority].freeze
 KIND_VALUES = %w[breaking deprecation migration optional].freeze
 
+# Control characters YAML makes from a single-backslash escape in a
+# double-quoted string, mapped to the regex escape the author meant.
+CONTROL_CHARS = {
+  "\b" => '\\\\b (word boundary)', "\e" => '\\\\e', "\a" => '\\\\a',
+  "\f" => '\\\\f', "\v" => '\\\\v', "\0" => '\\\\0'
+}.freeze
+CONTROL_RE = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/
+
+# Stress inputs for the bounded-time check: long runs of the shapes that made
+# real patterns backtrack (interpolation inside a hash, nested braces,
+# continuation lines), after a word taken from the pattern so a literal prefix
+# does not let the engine skip the input.
+STRESS_REPS = 400
+STRESS_LIMIT = 0.5 # seconds per match
+
+def stress_inputs(src)
+  words = src.scan(/[A-Za-z_]{3,}/).uniq.first(3)
+  prefixes = [""] + words.map { |w| "#{w} x, " }
+  openers = ["", "{", "(", "data: {"]
+  bodies = ['#{a} #', "a ", ", ", "x,\n", "{ a: "]
+  prefixes.product(openers, bodies).map { |p, o, b| p + o + (b * STRESS_REPS) }
+end
+
+# The start of the first stress input the regex cannot finish, or nil. Needs a
+# Ruby with Regexp timeouts (3.2+); older Rubies skip the check.
+def slow_input(src)
+  return nil unless Regexp.respond_to?(:timeout)
+
+  re = Regexp.new(src, timeout: STRESS_LIMIT)
+  stress_inputs(src).each do |input|
+    re.match?(input)
+  rescue Regexp::TimeoutError
+    return input[0, 40]
+  end
+  nil
+end
+
+SLOW_HINT = "hint: a repeated group has branches that can match the same text " \
+            '(e.g. `(?:[^{}]|#?\{...\})*`, where `#` fits both); make them exclusive ' \
+            '(`[^{}#]|#(?!\{)|#?\{...\}`) or bound the repetition'
+
 def validate(path)
   errors = []
   doc =
     begin
       YAML.safe_load_file(path)
     rescue Psych::SyntaxError => e
-      return ["YAML parse error: #{e.message}"]
+      hint =
+        if e.message.include?("unknown escape")
+          'hint: double every regex backslash inside a double-quoted YAML string ("\\\\s", "\\\\b"), or single-quote the value'
+        else
+          "hint: check indentation and quoting on the reported line"
+        end
+      return ["YAML parse error: #{e.message}; #{hint}"]
     end
 
   return ["top level is not a Hash"] unless doc.is_a?(Hash)
 
   TOP_LEVEL_KEYS.each do |k|
-    errors << "missing top-level key: #{k}" unless doc.key?(k)
+    errors << "missing top-level key: #{k}; hint: copy the header of a sibling rails-*-patterns.yml" unless doc.key?(k)
   end
 
   findings = doc["upgrade_findings"]
@@ -50,11 +103,12 @@ def validate(path)
       end
 
       PATTERN_KEYS.each do |k|
-        errors << "#{label}: missing key: #{k}" unless entry.key?(k)
+        errors << "#{label}: missing key: #{k}; hint: add `#{k}:` (an empty exclude is \"\"), see CLAUDE.md \"Detection patterns\"" unless entry.key?(k)
       end
 
       if entry.key?("kind") && !KIND_VALUES.include?(entry["kind"])
-        errors << "#{label}: invalid kind: #{entry["kind"].inspect} (allowed: #{KIND_VALUES.join(", ")})"
+        errors << "#{label}: invalid kind: #{entry["kind"].inspect} (allowed: #{KIND_VALUES.join(", ")}); " \
+                  "hint: judge the change at this hop, see CLAUDE.md \"Assigning kind\""
       end
 
       %w[pattern exclude].each do |key|
@@ -65,7 +119,20 @@ def validate(path)
         begin
           Regexp.new(val)
         rescue RegexpError => e
-          errors << "#{label}: #{key} regex does not compile: #{e.message}"
+          errors << "#{label}: #{key} regex does not compile: #{e.message}; " \
+                    "hint: in a double-quoted YAML string a literal regex backslash is written twice (\"\\\\(\" for a paren); " \
+                    "try it with: ruby -e 'p Regexp.new(ARGV[0])' '<regex>'"
+          next
+        end
+
+        if (ch = val[CONTROL_RE])
+          meant = CONTROL_CHARS.fetch(ch, "a doubled backslash")
+          errors << "#{label}: #{key} contains control character #{ch.inspect}; " \
+                    "hint: YAML turned a single-backslash escape into it, write #{meant} in the double-quoted string"
+        end
+
+        if (input = slow_input(val))
+          errors << "#{label}: #{key} regex did not finish in #{STRESS_LIMIT}s on a long input starting #{input.inspect}; #{SLOW_HINT}"
         end
       end
     end
@@ -117,6 +184,20 @@ def self_test
   bad_kind = Marshal.load(Marshal.dump(base))
   bad_kind["upgrade_findings"]["high_priority"][0]["kind"] = "bogus"
   cases << { name: "unknown kind value", doc: bad_kind, expect: :fail, match: /invalid kind: "bogus"/ }
+
+  control = Marshal.load(Marshal.dump(base))
+  control["upgrade_findings"]["high_priority"][0]["pattern"] = "\bfoo\b"
+  cases << { name: "single-backslash \\b read as a backspace", doc: control, expect: :fail, match: /control character "\\b".*word boundary/ }
+
+  if Regexp.respond_to?(:timeout)
+    slow = Marshal.load(Marshal.dump(base))
+    # A draft CONFIRM_OPTION regex: `#` fits both branches of the repeated
+    # hash body, so a long run of `#{a} #` backtracks.
+    slow["upgrade_findings"]["high_priority"][0]["pattern"] =
+      '(link_to)(?:(?:\bdata:)\s*\{(?:[^{}]|#?\{[^{}]*\})*\}|(?!%>|(?:\bdata:)\s*\{)[^\n])*?' \
+      '(?:(?<=[,({])[ \t]*\n(?:(?:\bdata:)\s*\{(?:[^{}]|#?\{[^{}]*\})*\}|(?!%>|(?:\bdata:)\s*\{)[^\n])*?){0,4}?(\bconfirm:)'
+    cases << { name: "catastrophic backtracking", doc: slow, expect: :fail, match: /did not finish in .*hint: a repeated group/ }
+  end
 
   passed = 0
   failed = []
