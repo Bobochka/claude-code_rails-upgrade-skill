@@ -15,6 +15,12 @@ CALLBACK_HALT:
     - "    false\n  end"
     - "      false\n    end\n  end"
     - "    false # stop the save\n  end"
+    # a bare false ending a branch, and a trailing modifier
+    - "      false\n    else\n      true\n    end"
+    - "      false\n    elsif draft?"
+    - "    false\n  rescue StandardError"
+    - "    false if archived?\n  end"
+    - "    false unless valid_state? # halt\n  end"
     # one-line blocks
     - "  before_save { false if archived? }"
     - "  before_destroy(if: :protected?) { false }"
@@ -24,6 +30,8 @@ CALLBACK_HALT:
     - "    throw :abort if locked?"
     - "    self.active = false\n  end"
     - "    false_positive_count\n  end"
+    - "    false\n    log_it\n  end"
+    - "    false if archived?\n    log_it\n  end"
     - "    enabled = false"
     - "  before_save { self.flag = true }"
     - "  after_save { false }"

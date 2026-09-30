@@ -210,9 +210,11 @@ Rack::Test::UploadedFile.new(file_path, 'image/png')
 Returning `false` from a before_* Active Record or Active Model callback no longer halts the
 chain. On 5.0 it still halts, with a deprecation warning, while
 `ActiveSupport.halt_callback_chains_on_return_false` is `true` (the setting an upgraded app gets);
-new 5.0 apps set it to `false`, and 5.2 removes the setting, so the save or destroy goes ahead.
-Nothing raises. A `before_save` that returns `false` saves the record on Active Record 5.2 and
-refuses it on 4.2, for the method form and the block form alike.
+new 5.0 apps set it to `false`. From 5.1 the setting is ignored (it only warns, and 5.2 removes
+it), so an app still on `true` starts saving or destroying at the 5.1 hop, warned only that the
+setting is deprecated.
+Nothing raises. A `before_save` that returns `false` saves the record on Active Record 5.1 and
+later and refuses it on 4.2, for the method form and the block form alike.
 
 Three shapes yield the halting `false`, and the bare trailing one is the easiest to miss:
 
@@ -227,7 +229,7 @@ end
 
 def guard
   if protected?
-    false            # the method's value; halts on 4.2, ignored on 5.2
+    false            # the method's value; halts on 4.2, ignored from 5.1
   else
     true
   end
