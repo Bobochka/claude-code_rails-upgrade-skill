@@ -133,7 +133,7 @@ goes away in 8.2.
 
 **Detection Pattern:**
 ```bash
-grep -rnE "[?&][A-Za-z_][][%.[:alnum:]_-]*=([^[:space:]'\"&;#<>=(){}!|]|#\{[^}]*\})*;[A-Za-z_][][%.[:alnum:]_-]*=" app/ lib/ config/ spec/ test/
+grep -rnE "[?&][A-Za-z_][][%.[:alnum:]_-]*=([^[:space:]'\"&;#<>!=(){}|]|#\{[^}]*\})*;[A-Za-z_][][%.[:alnum:]_-]*=" app/ lib/ config/ spec/ test/
 grep -rn "strict_query_string_separator" config/
 ```
 URLs that outside clients send can only be found in logs. Search the request log for `Started`
