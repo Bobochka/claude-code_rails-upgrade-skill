@@ -38,16 +38,16 @@ upgrade_findings:
   medium_priority:
     - name: "Semicolon query separator"
       kind: "breaking"
-      pattern: "[?&][A-Za-z_][\\w\\[\\]%.-]*=([^\\s'\"&;#<>]|#\\{[^}\\n]*\\})*;[A-Za-z_][\\w\\[\\]%.-]*=|\\bparse_(nested_)?query\\([^)\\n]*,\\s*['\"][&,]*;"
-      exclude: "\\A\\s*(#|//|\\*|<%#|-#)"
+      pattern: "[?&][A-Za-z_][\\w\\[\\]%.-]*=([^\\s'\"&;#<>=(){}!|]|#\\{[^}\\n]*\\})*;[A-Za-z_][\\w\\[\\]%.-]*="
+      exclude: "\\A\\s*(#(?![{\\w])|//|\\*|<%#|-#)"
       search_paths:
         - "app/"
         - "lib/"
         - "config/"
         - "spec/"
         - "test/"
-      explanation: "Rails 8.0's ActionDispatch::QueryParser still split a query string on `;` when the app ran Rack 2 (Rack's own separator then included `;`), with a deprecation warning: `/search?q=test;page=2` gave `{\"q\"=>\"test\", \"page\"=>\"2\"}`. Rails 8.1 splits on `&` only, so the same URL gives `{\"q\"=>\"test;page=2\"}`: nothing raises, `page` is just missing. An app that already ran Rack 3 on 8.0 got the new behavior at that hop, so this bites only apps that reach 8.1 from Rack 2. The pattern flags a query-string literal with a `;` between two `key=` pairs (in links, redirects, API clients and request specs) and a `parse_query` / `parse_nested_query` call passed a separator that includes `;`. Commented lines are skipped. It cannot see URLs built at runtime or sent by outside clients; the 8.0 deprecation warning in production logs is the way to find those"
-      fix: "Replace the `;` with `&` in query strings the app builds or links to (`/search?q=test&page=2`). A `parse_query(qs, \";\")` / `parse_nested_query(qs, \"&;\")` call with an explicit separator still works on 8.1 and needs no change if that is the intent. For URLs that outside clients send with `;`, there is no setting that restores the split: rewrite the query string in a Rack middleware before Rails parses it, or ask the clients to switch"
+      explanation: "Rails 8.0's ActionDispatch::QueryParser still split a query string, and a form-urlencoded request body, on `;` when the app ran Rack 2 (Rack's own separator then included `;`), with a deprecation warning: `/search?q=test;page=2` gave `{\"q\"=>\"test\", \"page\"=>\"2\"}`. Rails 8.1 splits on `&` only, so the same URL gives `{\"q\"=>\"test;page=2\"}`: nothing raises, `page` is just missing. An app that already ran Rack 3 on 8.0 got the new behavior at that hop, so this bites only apps that reach 8.1 from Rack 2. The pattern flags a query-string literal with a `;` between two `key=` pairs (in links, redirects, API clients and request specs). Commented lines are skipped. It cannot see URLs built at runtime or sent by outside clients. For those, search the request log for `Started` lines whose query string holds a `;` between two `key=` pairs, or the proxy's access log; the 8.0 deprecation warning is no help in production, where the generated config sets `report_deprecations = false`"
+      fix: "Replace the `;` with `&` in query strings the app builds or links to (`/search?q=test&page=2`). For URLs that outside clients send with `;`, there is no setting that restores the split: rewrite the query string in a Rack middleware before Rails parses it, or ask the clients to switch"
       variable_name: "SEMICOLON_SEPARATOR"
 
     - name: "Sidekiq adapter built-in"

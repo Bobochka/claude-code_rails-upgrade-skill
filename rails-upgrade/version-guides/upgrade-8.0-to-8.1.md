@@ -117,8 +117,8 @@ bundle audit check --update
 #### Semicolon Query Separator Removed
 
 **What Changed:**
-On Rails 8.0 with Rack 2, `ActionDispatch::QueryParser` still split a query string on `;`, with a
-deprecation warning. Rails 8.1 splits on `&` only, so a `;` stays inside the value and the
+On Rails 8.0 with Rack 2, `ActionDispatch::QueryParser` still split a query string, and a form-urlencoded
+request body, on `;`, with a deprecation warning. Rails 8.1 splits on `&` only, so a `;` stays inside the value and the
 parameters after it disappear. Nothing raises. An app that already ran Rack 3 on 8.0 saw this at
 that hop.
 
@@ -133,11 +133,19 @@ goes away in 8.2.
 
 **Detection Pattern:**
 ```bash
-grep -rnE "[?&][A-Za-z_][][%.[:alnum:]_-]*=([^[:space:]'\"&;#<>]|#\{[^}]*\})*;[A-Za-z_][][%.[:alnum:]_-]*=" app/ lib/ config/ spec/ test/
+grep -rnE "[?&][A-Za-z_][][%.[:alnum:]_-]*=([^[:space:]'\"&;#<>=(){}!|]|#\{[^}]*\})*;[A-Za-z_][][%.[:alnum:]_-]*=" app/ lib/ config/ spec/ test/
 grep -rn "strict_query_string_separator" config/
 ```
-URLs that outside clients send can only be found in logs: on 8.0 with Rack 2, search production
-logs for `Using semicolon as a query string separator is deprecated` before the bump.
+URLs that outside clients send can only be found in logs. Search the request log for `Started`
+lines whose query string has a `;` between two `key=` pairs, or the proxy's access log:
+
+```bash
+grep -E 'Started [A-Z]+ "[^"]*\?[^"]*;[A-Za-z_][^"=]*=' log/production.log
+```
+
+The deprecation warning `Using semicolon as a query string separator is deprecated` does not show
+in production: the generated `production.rb` sets `config.active_support.report_deprecations =
+false`, and it is also silent when `strict_query_string_separator` is set to `false`.
 
 **Fix:**
 ```ruby
@@ -328,7 +336,7 @@ Error → section lookup for the most common errors encountered during this upgr
 | Deprecation warning for `pool:` in `database.yml`, or `Ambiguous configuration: 'pool' ... and 'max_connections'` | "pool: → max_connections:" — `max_connections: 5`, drop `pool:` |
 | SSL redirect not working in production | "SSL Configuration Commented Out" — uncomment `force_ssl` and `assume_ssl` in `production.rb` |
 | Sidekiq jobs not processing | "Sidekiq Adapter Removed" — `gem 'sidekiq', '>= 7.3.3'` |
-| A request parameter after a `;` in the URL is missing, or the value keeps `;rest=...` | "Semicolon Query Separator Removed" — use `&` |
+| A request parameter after a `;` in the URL or form body is missing, or the value keeps `;rest=...` | "Semicolon Query Separator Removed" — use `&` |
 | Deprecation warning for `strict_query_string_separator` | "Semicolon Query Separator Removed" — delete the setting |
 
 ---

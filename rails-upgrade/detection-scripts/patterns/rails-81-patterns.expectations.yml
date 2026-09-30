@@ -11,8 +11,9 @@ SEMICOLON_SEPARATOR:
     - "  get \"/items?filter[state]=open;sort=name\""
     - "    <a href=\"/feed?format=rss;lang=en\">Feed</a>"
     - "    url = \"#{base}/export?from=#{from};to=#{to}\""
-    - "    params = Rack::Utils.parse_nested_query(qs, \"&;\")"
-    - "    Rack::Utils.parse_query(env[\"QUERY_STRING\"], \";\")"
+    # interpolation and a HAML id element at the start of the line
+    - "#{base}/export?from=#{from};to=#{to}"
+    - "#feed= link_to 'Feed', '/feed?format=rss;lang=en'"
   no_match:
     # comments: Ruby, JS, ERB, HAML
     - "  # the old client sent /search?q=test;page=2"
@@ -26,8 +27,12 @@ SEMICOLON_SEPARATOR:
     - "    params = { q: params[:q] };"
     - "    src=\"data:image/png;base64,iVBORw0KGgo=\""
     - "    style=\"color: red; width: 10px\""
-    - "    Rack::Utils.parse_nested_query(qs)"
-    - "    Rack::Utils.parse_query(qs, \"&\")"
+    # an explicit separator still works on 8.1
+    - "    params = Rack::Utils.parse_nested_query(qs, \"&;\")"
+    # minified JS
+    - "e?t=1;n()"
+    - "a?b=c==d;e=f"
+    - "x?y=f(g);h=1"
 
 STRICT_QUERY_STRING_SEPARATOR_CONFIG:
   match:
