@@ -117,13 +117,27 @@ bundle audit check --update
 #### Semicolon Query Separator Removed
 
 **What Changed:**
-Semicolons (`;`) can no longer be used as query parameter separators.
+On Rails 8.0 with Rack 2, `ActionDispatch::QueryParser` still split a query string on `;`, with a
+deprecation warning. Rails 8.1 splits on `&` only, so a `;` stays inside the value and the
+parameters after it disappear. Nothing raises. An app that already ran Rack 3 on 8.0 saw this at
+that hop.
+
+| `GET /search?q=test;page=2` | `params` |
+|---|---|
+| Rails 8.0, Rack 2.2 | `{"q"=>"test", "page"=>"2"}` plus the deprecation warning |
+| Rails 8.0, Rack 3.1 | `{"q"=>"test;page=2"}` |
+| Rails 8.1 | `{"q"=>"test;page=2"}` |
+
+`config.action_dispatch.strict_query_string_separator` has no effect on 8.1 and warns that it
+goes away in 8.2.
 
 **Detection Pattern:**
-```ruby
-# URLs or code using semicolons
-"/search?q=test;page=2"
+```bash
+grep -rnE "[?&][A-Za-z_][][%.[:alnum:]_-]*=([^[:space:]'\"&;#<>]|#\{[^}]*\})*;[A-Za-z_][][%.[:alnum:]_-]*=" app/ lib/ config/ spec/ test/
+grep -rn "strict_query_string_separator" config/
 ```
+URLs that outside clients send can only be found in logs: on 8.0 with Rack 2, search production
+logs for `Using semicolon as a query string separator is deprecated` before the bump.
 
 **Fix:**
 ```ruby
@@ -133,6 +147,9 @@ Semicolons (`;`) can no longer be used as query parameter separators.
 # AFTER
 "/search?q=test&page=2"
 ```
+
+Delete `strict_query_string_separator` from the config. For outside clients that keep sending
+`;`, rewrite the query string in a Rack middleware ahead of Rails, or have them switch.
 
 ---
 
@@ -311,6 +328,8 @@ Error → section lookup for the most common errors encountered during this upgr
 | Deprecation warning for `pool:` in `database.yml`, or `Ambiguous configuration: 'pool' ... and 'max_connections'` | "pool: → max_connections:" — `max_connections: 5`, drop `pool:` |
 | SSL redirect not working in production | "SSL Configuration Commented Out" — uncomment `force_ssl` and `assume_ssl` in `production.rb` |
 | Sidekiq jobs not processing | "Sidekiq Adapter Removed" — `gem 'sidekiq', '>= 7.3.3'` |
+| A request parameter after a `;` in the URL is missing, or the value keeps `;rest=...` | "Semicolon Query Separator Removed" — use `&` |
+| Deprecation warning for `strict_query_string_separator` | "Semicolon Query Separator Removed" — delete the setting |
 
 ---
 
